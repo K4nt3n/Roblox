@@ -8,6 +8,17 @@ Run with **Test → Local Server, 2 players** unless noted. Automated tests for 
 - [ ] HUD shows 50 coins, level 1, Carrot ∞ in the seed bar.
 - [ ] Output shows no errors. Without API access, one warning about the in-memory store.
 
+## UI and feel
+- [ ] HUD: coin pill top left, level pill with the level number in the badge, menu on the right, seed hotbar at the bottom.
+- [ ] Buttons lift on hover, squash on press and spring back. Greyed-out buttons shake and toast why (e.g. "Not enough Coins yet!").
+- [ ] Opening a panel dims and blurs the world, the hotbar slides away, rows pop in. X, tapping outside, or gamepad B closes.
+- [ ] Opening Basket while Shop is open cross-fades. Shop and Fairs tabs slide their highlight.
+- [ ] Selling: coins fly from the Sell button into the coin pill, the number rolls up and a "+N" floats off.
+- [ ] Basket menu badge shows the produce count; Champion shows "!" when a care need is up; Ribbons counts new ribbons until the shed is opened.
+- [ ] Spam a button: toasts stack as "x2", never more than 3 on screen.
+- [ ] Device emulator (iPhone landscape, iPad, 1080p): everything readable, nothing off screen, hotbar clear of the thumbstick and jump button.
+- [ ] Gamepad: opening a panel selects its first button; the gold ring moves with the D-pad; B closes.
+
 ## Plant, grow, water, harvest
 - [ ] E on an empty plot plants a carrot. A small ball appears and swells smoothly (no jumps).
 - [ ] Label above the crop counts down. Stage changes give a visible bounce.

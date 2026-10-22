@@ -20,6 +20,7 @@ type Target = { level: number, xp: number, need: number }
 local card: Frame
 local fill: Frame
 local label: TextLabel
+local levelNumber: TextLabel? = nil
 local shownLevel = 0
 local shownFraction = 0
 local pending: Target? = nil
@@ -33,7 +34,17 @@ local function setFill(fraction: number, info: TweenInfo?)
 end
 
 local function setLabel(target: Target)
-	label.Text = string.format("Lv %d  ·  %d / %d XP", target.level, target.xp, target.need)
+	if levelNumber then
+		local changed = levelNumber.Text ~= tostring(target.level)
+		levelNumber.Text = tostring(target.level)
+		label.Text = string.format("%d / %d XP", target.xp, target.need)
+		local badge = levelNumber.Parent
+		if changed and shownLevel ~= 0 and badge and badge:IsA("GuiObject") then
+			Tweens.pop(badge, 0.35)
+		end
+	else
+		label.Text = string.format("Lv %d  ·  %d / %d XP", target.level, target.xp, target.need)
+	end
 end
 
 local function flash()
@@ -66,8 +77,14 @@ local function settle(target: Target)
 	shownLevel = target.level
 end
 
-function LevelBar.mount(levelCard: Frame, levelFill: Frame, levelLabel: TextLabel)
-	card, fill, label = levelCard, levelFill, levelLabel
+-- levelText (optional): a separate label for the level number, e.g. inside a level badge.
+function LevelBar.mount(levelCard: Frame, levelFill: Frame, levelLabel: TextLabel, levelText: TextLabel?)
+	card, fill, label, levelNumber = levelCard, levelFill, levelLabel, levelText
+end
+
+-- The GuiObject essence flies into (a fly-to target for other effects too).
+function LevelBar.target(): GuiObject?
+	return card
 end
 
 -- Called with every server snapshot.

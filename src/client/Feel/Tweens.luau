@@ -23,6 +23,15 @@ Tweens.Ease = {
 	-- Bouncy world objects (crops growing a stage).
 	Bounce = TweenInfo.new(0.45, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
 	Quick = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	-- Buttons: lift on hover, squash on press, spring back on release.
+	Hover = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	Press = TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	Release = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0),
+	-- Panels: springy in, quick and quiet out.
+	PanelIn = TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	PanelOut = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+	-- Layout that grows or collapses (toasts leaving, rows appearing).
+	Collapse = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
 }
 
 function Tweens.play(instance: Instance, info: TweenInfo, goal: { [string]: any }): Tween?
@@ -54,12 +63,16 @@ function Tweens.pop(gui: GuiObject, strength: number?)
 	Tweens.play(scale, Tweens.Ease.Pop, { Scale = 1 })
 end
 
--- Panel entrance: grow from 0.85 and fade in.
+-- Panel entrance: spring up from slightly small while fading in.
+-- A token stops a close that is still finishing from hiding a panel that just reopened.
+local panelTokens: { [GuiObject]: number } = {}
+
 function Tweens.openPanel(gui: GuiObject)
+	panelTokens[gui] = (panelTokens[gui] or 0) + 1
 	gui.Visible = true
 	local scale = getScale(gui)
-	scale.Scale = 0.85
-	Tweens.play(scale, Tweens.Ease.Pop, { Scale = 1 })
+	scale.Scale = 0.88
+	Tweens.play(scale, Tweens.Ease.PanelIn, { Scale = 1 })
 	if gui:IsA("CanvasGroup") then
 		gui.GroupTransparency = 1
 		Tweens.play(gui, Tweens.Ease.Fade, { GroupTransparency = 0 })
@@ -67,17 +80,59 @@ function Tweens.openPanel(gui: GuiObject)
 end
 
 function Tweens.closePanel(gui: GuiObject)
+	local token = (panelTokens[gui] or 0) + 1
+	panelTokens[gui] = token
 	local scale = getScale(gui)
-	local tween = Tweens.play(scale, Tweens.Ease.Fade, { Scale = 0.9 })
+	local tween = Tweens.play(scale, Tweens.Ease.PanelOut, { Scale = 0.94 })
 	if gui:IsA("CanvasGroup") then
-		Tweens.play(gui, Tweens.Ease.Fade, { GroupTransparency = 1 })
+		Tweens.play(gui, Tweens.Ease.PanelOut, { GroupTransparency = 1 })
+	end
+	local function hide()
+		if panelTokens[gui] == token then
+			gui.Visible = false
+			panelTokens[gui] = nil
+		end
 	end
 	if tween then
-		tween.Completed:Once(function()
-			gui.Visible = false
-		end)
+		tween.Completed:Once(hide)
 	else
-		gui.Visible = false
+		hide()
+	end
+end
+
+-- Little horizontal "no" shake for a denied tap.
+local shaking: { [GuiObject]: boolean } = {}
+function Tweens.shake(gui: GuiObject, strength: number?)
+	if Tweens.reducedMotion or shaking[gui] then
+		return
+	end
+	shaking[gui] = true
+	local rotation = gui.Rotation
+	local amount = strength or 6
+	task.spawn(function()
+		for _, k in { 1, -1, 0.6, -0.6, 0.25, 0 } do
+			if not gui.Parent then
+				break
+			end
+			gui.Rotation = rotation + amount * k
+			task.wait(0.035)
+		end
+		gui.Rotation = rotation
+		shaking[gui] = nil
+	end)
+end
+
+-- Pops a list of GuiObjects in one after another (rows appearing in a panel).
+function Tweens.stagger(guis: { GuiObject }, gap: number?, from: number?)
+	if Tweens.reducedMotion then
+		return
+	end
+	for i, gui in guis do
+		local scale = getScale(gui)
+		scale.Scale = from or 0.86
+		task.delay((i - 1) * (gap or 0.03), function()
+			Tweens.play(scale, Tweens.Ease.Pop, { Scale = 1 })
+		end)
 	end
 end
 

@@ -19,12 +19,19 @@ local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 local Modal = require(script.Parent.Modal)
 local RibbonNames = require(script.Parent.RibbonNames)
+local ArtSlot = require(script.Parent.ArtSlot)
 
 local FairPanel = {}
 
 local localPlayer = Players.LocalPlayer
 local PERIODS = FairMath.sortedPeriods(Config.Fair.periods)
-local selectedFair = "weekly"
+
+-- Tabs for the panel header (UIController builds them once, so the highlight can slide).
+FairPanel.TABS = {} :: { UIKit.TabItem }
+for _, period in PERIODS do
+	table.insert(FairPanel.TABS, { id = period.id, text = period.displayName })
+end
+FairPanel.DEFAULT_TAB = if Config.Fair.periods.weekly then "weekly" else PERIODS[1].id
 
 local function cropName(cropId: string?): string
 	local crop = cropId and Config.Crops[cropId]
@@ -37,33 +44,20 @@ local function currentEntry(data: { [string]: any }, fairName: string): any
 	return info and entries and entries[tostring(info.id)]
 end
 
-function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, rerender: () -> ())
-	-- Fair tabs.
-	local tabs = UIKit.new("Frame", {
-		LayoutOrder = 0,
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, -8, 0, 44),
-		Parent = body,
-	}, { UIKit.list(Enum.FillDirection.Horizontal, 8) })
-	for i, period in PERIODS do
-		local selected = period.id == selectedFair
-		UIKit.button(period.displayName, function()
-			selectedFair = period.id
-			rerender()
-		end, {
-			LayoutOrder = i,
-			Size = UDim2.fromOffset(170, 40),
-			BackgroundColor3 = if selected then Theme.Colors.PrimaryDark else Theme.Colors.Surface,
-			TextColor3 = if selected then Theme.Colors.TextOnPrimary else Theme.Colors.Text,
-		}).Parent = tabs
-	end
-
+function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: string?)
+	local selectedFair = if tab and Config.Fair.periods[tab] then tab else FairPanel.DEFAULT_TAB
 	local period = Config.Fair.periods[selectedFair]
 	local fairInfo = data.fairs and data.fairs[selectedFair]
 	local endsAt = if fairInfo then fairInfo.endsAt else 0
 	local entry = currentEntry(data, selectedFair)
 
-	local info = UIKit.card({ Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Parent = body }, {
+	local info = UIKit.card({
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = 1,
+		BackgroundColor3 = Theme.lighten(Theme.Colors.Gold, 0.8),
+		Parent = body,
+	}, {
 		UIKit.padding(12),
 		UIKit.list(Enum.FillDirection.Vertical, 4),
 	})
@@ -97,12 +91,11 @@ function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, rerende
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 		}).Parent = info
-
 	end
 
 	if RunService:IsStudio() then
 		UIKit.button("Preview show (Studio)", function()
-			NetClient.request(Net.Actions.DebugStartFairDay, { fair = selectedFair })
+			task.spawn(NetClient.request, Net.Actions.DebugStartFairDay, { fair = selectedFair })
 		end, { LayoutOrder = 10, Size = UDim2.fromOffset(220, 36), BackgroundColor3 = Theme.Colors.Accent }).Parent = info
 	end
 
@@ -118,21 +111,35 @@ function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, rerende
 	if #rows == 0 then
 		UIKit.label("No entries yet. Be the first!", Theme.TextSize.Body, { LayoutOrder = 20, Font = Theme.FontBody }).Parent = body
 	end
+	local MEDALS = { Theme.Colors.Gold, Color3.fromRGB(205, 210, 220), Color3.fromRGB(215, 150, 95) }
 	for i, row in rows do
 		local isMe = row.userId == localPlayer.UserId
-		UIKit.card({
-			Size = UDim2.new(1, -8, 0, 44),
+		local card = UIKit.card({
+			Size = UDim2.new(1, -8, 0, 48),
 			LayoutOrder = 20 + i,
-			BackgroundColor3 = if isMe then Theme.Colors.Gold else Theme.Colors.Surface,
+			BackgroundColor3 = if isMe then Theme.lighten(Theme.Colors.Gold, 0.5) else Theme.Colors.Surface,
 			Parent = body,
 		}, {
-			UIKit.label(string.format("#%d  %s", row.rank, row.name), Theme.TextSize.Body, { Position = UDim2.fromOffset(12, 10) }),
+			UIKit.label(string.format("#%d  %s", row.rank, row.name), Theme.TextSize.Body, {
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, if row.rank <= 3 then 52 else 14, 0.5, 0),
+			}),
 			UIKit.label(Format.weight(row.weight), Theme.TextSize.Body, {
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -12, 0, 10),
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -14, 0.5, 0),
 				TextXAlignment = Enum.TextXAlignment.Right,
 			}),
 		})
+		if row.rank <= 3 then
+			ArtSlot.icon("Medal_" .. row.rank, {
+				size = 32,
+				round = true,
+				color = MEDALS[row.rank],
+				glyph = tostring(row.rank),
+				anchor = Vector2.new(0, 0.5),
+				position = UDim2.new(0, 12, 0.5, 0),
+			}).Parent = card
+		end
 	end
 end
 
@@ -154,11 +161,11 @@ function FairPanel.pick(item: { [string]: any })
 					then (if entry.weight >= item.weight then "Your entry is heavier (" .. Format.weight(entry.weight) .. ")" else "Replaces " .. Format.weight(entry.weight))
 					else "No entry yet"
 				local canEnter = not entry or entry.weight < item.weight
-				local button = UIKit.button(period.displayName, function()
-					NetClient.request(Net.Actions.EnterFair, { uid = item.uid, fair = period.id })
+				local button = UIKit.button("Enter", function()
+					task.spawn(NetClient.request, Net.Actions.EnterFair, { uid = item.uid, fair = period.id })
 					close()
-				end, { Size = UDim2.fromOffset(170, 40), BackgroundColor3 = Theme.Colors.Gold, TextColor3 = Theme.Colors.Text })
-				UIKit.setEnabled(button, canEnter, Theme.Colors.Gold)
+				end, { BackgroundColor3 = Theme.Colors.Gold })
+				UIKit.setEnabled(button, canEnter, nil, "Your entry there is already heavier!")
 				local row = UIKit.row(period.displayName, string.format("Judging in %s · %s", left, status), { button })
 				row.LayoutOrder = i
 				row.Size = UDim2.new(1, 0, 0, 64)

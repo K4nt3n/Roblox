@@ -35,6 +35,7 @@ local Tweens = require(script.Parent.Parent.Feel.Tweens)
 local CropVisuals = require(script.Parent.CropVisuals)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
+local Scale = require(script.Parent.Parent.UI.Scale)
 
 local FairDayController = {}
 
@@ -449,7 +450,7 @@ local function build()
 		Name = "GVF_FairDay",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
-		DisplayOrder = 10,
+		DisplayOrder = Theme.Layer.FairDay,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = localPlayer:WaitForChild("PlayerGui"),
 	})
@@ -468,6 +469,9 @@ local function build()
 		Parent = gui,
 	})
 
+	-- Cards and buttons live in a scaled root so they size up and down with the screen.
+	local root = Scale.root(gui, "Show")
+
 	banner = UIKit.card({
 		Name = "Banner",
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -476,7 +480,7 @@ local function build()
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundColor3 = Theme.Colors.Gold,
 		Visible = false,
-		Parent = gui,
+		Parent = root,
 	}, { UIKit.padding(8) })
 	bannerText = UIKit.label("", Theme.TextSize.Body, { Parent = banner })
 
@@ -489,7 +493,7 @@ local function build()
 		BackgroundColor3 = Theme.Colors.Background,
 		BorderSizePixel = 0,
 		Visible = false,
-		Parent = gui,
+		Parent = root,
 	}, {
 		UIKit.corner(),
 		UIKit.stroke(Theme.Colors.Gold, 3),
@@ -511,7 +515,7 @@ local function build()
 		Size = UDim2.fromOffset(170, 40),
 		BackgroundColor3 = Theme.Colors.Accent,
 		Visible = false,
-		Parent = gui,
+		Parent = root,
 	})
 end
 
