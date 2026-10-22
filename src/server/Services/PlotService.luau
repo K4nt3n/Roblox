@@ -19,10 +19,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Signal = require(Shared.Signal)
+local CareMath = require(Shared.CareMath)
 
 local PlotService = {}
 
-PlotService.PromptTriggered = Signal.new() -- (player, ownerUserId, plotId, promptKind: "Main" | "Water")
+PlotService.PromptTriggered = Signal.new() -- (player, ownerUserId, plotId, promptKind: "Main" | "Water" | "Care")
 
 local gardensFolder: Folder
 local slotOwners: { [number]: Player } = {}
@@ -38,6 +39,11 @@ local PLANT_ATTRIBUTES = {
 	"lastWateredAt",
 	"sizeRoll",
 	"gene",
+	"champion",
+	"careInterval",
+	"careScore",
+	"name",
+	"paidSkips",
 }
 
 local function rgb(t: { number }): Color3
@@ -141,6 +147,34 @@ local function buildGarden(player: Player, slot: number): Model
 		makePrompt(plot, "Water", Enum.KeyCode.R, "Water")
 	end
 
+	-- The champion plot: one big plot in front of the garden for the veggie raised all week.
+	local championSize = w.plotSize * 1.6
+	local champion = Instance.new("Part")
+	champion.Name = Config.Champion.plotId
+	champion.Anchored = true
+	champion.Size = Vector3.new(championSize, 0.8, championSize)
+	champion.CFrame = origin * CFrame.new(0, 1.4, depth / 2 + 4 + championSize / 2 + 2)
+	champion.Material = Enum.Material.SmoothPlastic
+	champion.Color = rgb(w.colors.soil)
+	champion:SetAttribute("PlotId", Config.Champion.plotId)
+	champion:SetAttribute("OwnerUserId", player.UserId)
+	champion:SetAttribute("IsChampionPlot", true)
+	champion.Parent = plots
+
+	local pad = Instance.new("Part")
+	pad.Name = "ChampionPad"
+	pad.Anchored = true
+	pad.Size = Vector3.new(championSize + 4, 1, championSize + 4)
+	pad.CFrame = origin * CFrame.new(0, 0.5, depth / 2 + 4 + championSize / 2 + 2)
+	pad.Color = rgb(w.colors.stand)
+	pad.Material = Enum.Material.SmoothPlastic
+	pad.Parent = model
+
+	makePrompt(champion, "Main", Enum.KeyCode.E, "Plant Champion")
+	makePrompt(champion, "Water", Enum.KeyCode.R, "Water")
+	local care = makePrompt(champion, "Care", Enum.KeyCode.F, "Care")
+	care.Enabled = false
+
 	model.Parent = gardensFolder
 	return model
 end
@@ -190,6 +224,50 @@ local function buildStands()
 	folder.Parent = workspace
 end
 
+-- The live Fair Day stage. Map art can provide Workspace.FairStage with Scale and CameraPoint parts.
+local function buildFairStage()
+	local stage = workspace:FindFirstChild("FairStage")
+	if stage then
+		return
+	end
+	local p = Config.FairDay.stagePosition
+	local origin = CFrame.new(p[1], p[2], p[3])
+	stage = Instance.new("Model")
+	stage.Name = "FairStage"
+
+	local floor = Instance.new("Part")
+	floor.Name = "Floor"
+	floor.Anchored = true
+	floor.Size = Vector3.new(36, 2, 18)
+	floor.CFrame = origin * CFrame.new(0, 1, 0)
+	floor.Color = rgb(Config.World.colors.stand)
+	floor.Material = Enum.Material.SmoothPlastic
+	floor.Parent = stage
+
+	local scale = Instance.new("Part")
+	scale.Name = "Scale"
+	scale.Anchored = true
+	scale.Shape = Enum.PartType.Cylinder
+	scale.Size = Vector3.new(1, 10, 10)
+	scale.CFrame = origin * CFrame.new(0, 2.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+	scale.Color = Color3.fromRGB(235, 235, 240)
+	scale.Material = Enum.Material.SmoothPlastic
+	scale.Parent = stage
+
+	local cameraPoint = Instance.new("Part")
+	cameraPoint.Name = "CameraPoint"
+	cameraPoint.Anchored = true
+	cameraPoint.CanCollide = false
+	cameraPoint.CanQuery = false
+	cameraPoint.Transparency = 1
+	cameraPoint.Size = Vector3.one
+	cameraPoint.CFrame = CFrame.lookAt((origin * CFrame.new(0, 12, 34)).Position, (origin * CFrame.new(0, 4, 0)).Position)
+	cameraPoint.Parent = stage
+
+	stage.PrimaryPart = floor
+	stage.Parent = workspace
+end
+
 function PlotService:Start()
 	-- Empty places get a placeholder ground so the prototype is playable anywhere.
 	if not workspace:FindFirstChild("Baseplate") and not workspace:FindFirstChild("Map") then
@@ -204,6 +282,7 @@ function PlotService:Start()
 		ground.Parent = workspace
 	end
 	buildStands()
+	buildFairStage()
 
 	local ProximityPromptService = game:GetService("ProximityPromptService")
 	ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
@@ -216,7 +295,7 @@ function PlotService:Start()
 		if type(ownerUserId) ~= "number" or type(plotId) ~= "string" then
 			return
 		end
-		local kind = if prompt.Name == "Water" then "Water" else "Main"
+		local kind = if prompt.Name == "Water" or prompt.Name == "Care" then prompt.Name else "Main"
 		self.PromptTriggered:Fire(player, ownerUserId, plotId, kind)
 	end)
 
@@ -260,9 +339,13 @@ end
 
 function PlotService:GetSpawnCFrame(player: Player): CFrame?
 	local garden = gardens[player]
-	if garden and garden.PrimaryPart then
-		local depth = garden.PrimaryPart.Size.Z
-		return garden.PrimaryPart.CFrame * CFrame.new(0, 4, depth / 2 + 4)
+	local pad = garden and garden:FindFirstChild("ChampionPad")
+	if pad and pad:IsA("BasePart") then
+		-- Stand just in front of the champion, facing the garden.
+		return CFrame.lookAt(
+			pad.Position + pad.CFrame.LookVector * -(pad.Size.Z / 2 + 4) + Vector3.new(0, 4, 0),
+			pad.Position + Vector3.new(0, 4, 0)
+		)
 	end
 	return nil
 end
@@ -286,6 +369,10 @@ function PlotService:SyncPlot(player: Player, plotId: string, plant: { [string]:
 	for _, key in PLANT_ATTRIBUTES do
 		part:SetAttribute(key, if plant then plant[key] else nil)
 	end
+	-- Tables don't fit in attributes; encode the champion's care log and co-growers as text.
+	part:SetAttribute("careDone", if plant and plant.champion then CareMath.encodeDone(plant.care) else nil)
+	local coGrowers = plant and plant.coGrowers
+	part:SetAttribute("coGrowers", if coGrowers and #coGrowers > 0 then table.concat(coGrowers, ",") else nil)
 end
 
 function PlotService:SyncAll(player: Player, data: { [string]: any })
@@ -293,6 +380,8 @@ function PlotService:SyncAll(player: Player, data: { [string]: any })
 		local plotId = tostring(i)
 		self:SyncPlot(player, plotId, data.plots[plotId], i > data.ownedPlots)
 	end
+	self:SyncPlot(player, Config.Champion.plotId, data.plots[Config.Champion.plotId], false)
 end
+
 
 return PlotService

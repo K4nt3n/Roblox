@@ -7,10 +7,12 @@
 local ClientState = require(script:WaitForChild("ClientState"))
 local FeelController = require(script:WaitForChild("Feel"):WaitForChild("FeelController"))
 local GardenController = require(script:WaitForChild("Controllers"):WaitForChild("GardenController"))
+local FairDayController = require(script:WaitForChild("Controllers"):WaitForChild("FairDayController"))
 local UIController = require(script:WaitForChild("UI"):WaitForChild("UIController"))
 
 FeelController.start()
 GardenController.start()
 UIController.start()
+FairDayController.start()
 -- Listen last: every controller is subscribed before the first snapshot arrives.
 ClientState.start()

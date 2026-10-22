@@ -20,6 +20,8 @@ Net.Remotes = {
 	Feedback = "Feedback",
 	-- RemoteEvent (server -> client): fair leaderboard rows.
 	Leaderboard = "Leaderboard",
+	-- RemoteEvent (server -> all clients): live Fair Day show state.
+	FairDay = "FairDay",
 }
 
 Net.Actions = {
@@ -32,6 +34,10 @@ Net.Actions = {
 	EnterFair = "EnterFair", -- { uid }
 	PromptSkip = "PromptSkip", -- { plotId }
 	DebugSimulatePurchase = "DebugSimulatePurchase", -- { product } Studio only
+	NameChampion = "NameChampion", -- { name }
+	InviteCoGrower = "InviteCoGrower", -- { userId }
+	RespondCoGrow = "RespondCoGrow", -- { ownerUserId, accept }
+	DebugStartFairDay = "DebugStartFairDay", -- {} Studio only
 }
 
 -- Feedback event names the server can send. The client maps these to feel presets.
@@ -49,6 +55,13 @@ Net.Feedback = {
 	FairReward = "FairReward",
 	WelcomeBack = "WelcomeBack",
 	Denied = "Denied",
+	CareDone = "CareDone",
+	CareNeeded = "CareNeeded",
+	ChampionNamed = "ChampionNamed",
+	CoGrowInvite = "CoGrowInvite",
+	CoGrowJoined = "CoGrowJoined",
+	ServerPrize = "ServerPrize",
+	MailReceived = "MailReceived",
 }
 
 return Net

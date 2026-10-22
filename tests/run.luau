@@ -10,6 +10,7 @@ local TestKit = require("./TestKit")
 require("./GrowthMath.spec")
 require("./EconomyMath.spec")
 require("./FairMath.spec")
+require("./CareMath.spec")
 require("./Format.spec")
 require("./Schema.spec")
 

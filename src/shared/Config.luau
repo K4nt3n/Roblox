@@ -210,10 +210,85 @@ Config.Levels = {
 	maxLevel = 50,
 }
 
+local FAIR_ANCHOR = 1704560400 -- Saturday 6 Jan 2024, 17:00 UTC
+
 Config.Fair = {
-	-- Weeks roll over at this Unix time offset (Saturday 17:00 UTC). One week = 604800s.
-	weekAnchorUnix = 1704560400,
+	-- The weekly fair rolls over at this Unix time offset (Saturday 17:00 UTC).
+	weekAnchorUnix = FAIR_ANCHOR,
 	weekSeconds = 7 * 24 * HOUR,
+
+	--[[
+		Three fairs run side by side. Each has its own entries, global boards,
+		live show and prizes. A crop can only be entered in one of them.
+		  divisions:  which divisions this fair judges (see `divisions` below)
+		  rewardScale: multiplier on coin prizes
+		  show:       timings for the live show (FairDayService)
+		The hourly fair rolls over at half past so it never collides with the
+		daily/weekly rollover. When daily and weekly roll over together
+		(Saturdays), the weekly show runs and daily results arrive as a card.
+	]]
+	periods = {
+		hourly = {
+			id = "hourly",
+			displayName = "Hourly Fair",
+			order = 1,
+			seconds = HOUR,
+			anchorUnix = FAIR_ANCHOR + 30 * MINUTE,
+			divisions = { "overall" },
+			rewardScale = 0.1,
+			show = {
+				announceSeconds = 60,
+				liveWindowSeconds = 2 * MINUTE,
+				gatherSeconds = 5,
+				weighSecondsPerEntry = 3,
+				maxStageEntries = 5,
+				awardsSeconds = 8,
+				globalSeconds = 5,
+				emptySeconds = 4,
+				prizeScale = 0.15,
+			},
+		},
+		daily = {
+			id = "daily",
+			displayName = "Daily Fair",
+			order = 2,
+			seconds = 24 * HOUR,
+			anchorUnix = FAIR_ANCHOR,
+			divisions = { "overall", "crop" },
+			rewardScale = 0.35,
+			show = {
+				announceSeconds = 3 * MINUTE,
+				liveWindowSeconds = 4 * MINUTE,
+				gatherSeconds = 8,
+				weighSecondsPerEntry = 4,
+				maxStageEntries = 8,
+				awardsSeconds = 12,
+				globalSeconds = 8,
+				emptySeconds = 5,
+				prizeScale = 0.4,
+			},
+		},
+		weekly = {
+			id = "weekly",
+			displayName = "Weekly Grand Fair",
+			order = 3,
+			seconds = 7 * 24 * HOUR,
+			anchorUnix = FAIR_ANCHOR,
+			divisions = { "overall", "crop", "firstTimer", "improved", "natural", "team", "helper" },
+			rewardScale = 1,
+			show = {
+				announceSeconds = 5 * MINUTE,
+				liveWindowSeconds = 5 * MINUTE,
+				gatherSeconds = 12,
+				weighSecondsPerEntry = 6,
+				maxStageEntries = 12,
+				awardsSeconds = 16,
+				globalSeconds = 12,
+				emptySeconds = 6,
+				prizeScale = 1,
+			},
+		},
+	},
 	-- Tier rewards claimed the next time the player joins after the week ends.
 	-- Ranks come from the global OrderedDataStore; topN is inclusive.
 	rewardTiers = {
@@ -224,11 +299,80 @@ Config.Fair = {
 	},
 	leaderboardSize = 10,
 	leaderboardRefreshSeconds = 60,
+
+	-- "Ribbons for everyone": extra divisions so lots of kids win something each week.
+	-- Each division has its own global OrderedDataStore board. "overall" uses rewardTiers above.
+	divisionTiers = {
+		{ id = "blue", topN = 1, coins = 3000, ribbon = "Blue" },
+		{ id = "red", topN = 3, coins = 1500, ribbon = "Red" },
+		{ id = "yellow", topN = 10, coins = 800, ribbon = "Yellow" },
+	},
+	divisions = {
+		overall = { displayName = "Heaviest Overall" },
+		crop = { displayName = "Best %s" }, -- one board per crop type, e.g. crop_pumpkin
+		firstTimer = { displayName = "First-Timer Class" },
+		improved = { displayName = "Most Improved" },
+		natural = { displayName = "Natural Grown" }, -- champions with zero paid skips
+		team = { displayName = "Team Grown" }, -- champions grown with co-growers
+		helper = { displayName = "Helpful Neighbor" }, -- most friend waters this week, no entry needed
+		server = { displayName = "Live Show Podium" }, -- top three in your server at the live show
+	},
+	-- Helper scores are flushed to the board at most this often per player.
+	helperFlushSeconds = 60,
+}
+
+Config.FairDay = {
+	-- Shared settings for the live shows. Per-fair timings live in Config.Fair.periods[*].show.
+	-- Prizes for the top three entries in this server, scaled by each fair's show.prizeScale.
+	serverPrizes = {
+		{ coins = 1500, ribbon = "Blue" },
+		{ coins = 800, ribbon = "Red" },
+		{ coins = 400, ribbon = "Yellow" },
+	},
+	stagePosition = { 0, 0, -75 },
+}
+
+Config.Champion = {
+	-- One special plot per player for the veggie they raise all week.
+	plotId = "C",
+	-- The champion keeps swelling for at least this long after it ripens...
+	minGiantSeconds = 5 * 24 * HOUR,
+	-- ...and can get this much bigger than a normal crop of the same type.
+	giantMultiplierBonus = 1.5,
+	-- Care needs (water, pests, propping up) appear every interval. Handling one adds weight.
+	maxCareEvents = 14,
+	minCareIntervalSeconds = 60,
+	maxCareIntervalSeconds = 8 * HOUR,
+	-- Shorter interval in Studio so care can be tested quickly.
+	studioCareIntervalSeconds = 45,
+	-- Handled within this fraction of the interval = full credit; later = lateCredit.
+	onTimeFraction = 0.5,
+	lateCredit = 0.5,
+	-- A need left unhandled for this many intervals expires (no penalty, just no bonus).
+	needExpiresAfterIntervals = 2,
+	-- Weight bonus per care point. Full care (14 points) beats the Giant gene on purpose.
+	careBonusPerPoint = 0.08,
+	xpPerCare = 8,
+	maxNameLength = 20,
+	-- Grow together: friends who co-grow your champion.
+	maxCoGrowers = 2,
+	coGrowRequiresFriendship = true,
+	inviteExpiresSeconds = 120,
+	-- Share of the owner's fair prize each co-grower gets by mail.
+	coGrowerShare = 0.5,
 }
 
 Config.Monetization = {
 	-- Coins given instead if a Skip is bought while nothing is growing.
 	skipRefundCoins = 500,
+	-- Honest shop: paid skips on the champion are capped per fair week, and any paid skip
+	-- makes that champion ineligible for the Natural Grown division.
+	championSkipsPerWeek = 1,
+	-- Game passes (convenience, never power in the fair). 0 = not created yet.
+	Passes = {
+		ExtraPlotRow = { passId = 0 },
+		SeasonFairPass = { passId = 0 },
+	},
 	-- Set real ids from the Creator Dashboard. 0 = stub (simulated purchases allowed in Studio only).
 	Products = {
 		SkipGrowth = { productId = 0, kind = "SkipGrowth" },
@@ -238,7 +382,9 @@ Config.Monetization = {
 
 Config.Data = {
 	storeName = "GVF_PlayerData_v1",
-	fairStorePrefix = "GVF_Fair_v1_",
+	fairStorePrefix = "GVF_Fair_v2_",
+	mailStoreName = "GVF_Mail_v1",
+	maxMail = 50,
 	autosaveSeconds = 120,
 	sessionLockSeconds = 30 * MINUTE,
 	maxLoadRetries = 5,

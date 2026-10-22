@@ -28,11 +28,31 @@ Run with **Test → Local Server, 2 players** unless noted. Automated tests for 
 - [ ] Buying a plot un-fades the next plot. E on the next locked plot also offers to buy it.
 - [ ] Basket: sell one and Sell All both pay the shown price.
 
-## Fair
-- [ ] Enter Fair from the Basket removes the item and shows it in the Fair panel and top 10.
-- [ ] Entering a lighter crop is refused; a heavier one replaces the entry and returns the old one.
-- [ ] Countdown ticks every second while the panel is open.
-- [ ] Week rollover: set `Config.Fair.weekAnchorUnix` so the week ends in a minute, rejoin after it ends, and confirm the reward toast and coins.
+## XP essence
+- [ ] Harvest a crop: glowing orbs pop out of it, tumble, then curve into the XP bar. The bar fills in steps as they land, never snaps.
+- [ ] Harvest enough for a level-up: the bar fills to the end, flashes gold, rolls over to the new level.
+- [ ] Watering a friend's garden and caring for a champion also send essence.
+
+## Champion
+- [ ] A big plot sits in front of each garden. E on it says "Plant Champion" and plants the selected seed.
+- [ ] In Studio a care need appears every 45 s: label hops and shows "Thirsty!", "Bugs!" or "Leaning!", and a toast says so.
+- [ ] Thirsty: Water prompt says "Water (thirsty!)". Bugs / Leaning: F prompt appears. Handling it shows a toast, essence and adds care points (Champion panel).
+- [ ] Champion panel: name it. Name shows on the plot label and in the fair. A rude name is filtered.
+- [ ] Shop → Skip the wait: champion skip works once, then the button greys out and the server says "once a week". Panel now says "Natural Grown: not eligible".
+
+## Grow together
+- [ ] Champion panel → Invite Player 2. Player 2 gets a card; "Let's grow!" adds them. Both see a toast.
+- [ ] Player 2 sees the F care prompt on Player 1's champion and can water it.
+- [ ] After a fair with a prize, Player 2 gets coins and a team ribbon by mail (toast), also if they rejoin later.
+
+## Fairs
+- [ ] Basket → Enter Fair opens a picker with Hourly, Daily and Weekly. Entering removes the item and the toast names the fair and divisions.
+- [ ] Entering a lighter crop in the same fair is refused; a heavier one replaces the entry and returns the old one.
+- [ ] Fairs panel: tabs switch fairs; each shows its countdown, your entry, divisions and top 10.
+- [ ] Fairs panel → "Preview show (Studio)": banner, letterbox, camera glides to the stage, each entry is weighed with a count-up, podium cards pop in winner last, global top 3, then the camera returns. "Back to garden" works at any time.
+- [ ] Preview with nobody entered shows the "No entries from this server" card.
+- [ ] Rollover: set an hourly `anchorUnix` so the hour ends in two minutes. The announce banner counts down, the show runs by itself, and results arrive as a card after it. A player who joins after the show gets "You missed the ... Here's the replay".
+- [ ] Ribbons panel lists every ribbon won with a readable name.
 
 ## Skip wait (stub)
 - [ ] Shop → Garden → Skip on a growing crop makes it ripe at once (Studio only).

@@ -123,6 +123,22 @@ local Presets: { [string]: (context: { [string]: any }) -> string? } = {
 		Tweens.cameraPunch(5)
 		return nil
 	end,
+	CareDone = function()
+		Tweens.cameraPunch(1.5)
+		return nil
+	end,
+	FairWeighIn = function(context)
+		Tweens.cameraPunch(if context.isMine then 4 else 2)
+		return nil
+	end,
+	FairConfetti = function()
+		Tweens.cameraPunch(5)
+		return nil
+	end,
+	ServerPrize = function()
+		Tweens.cameraPunch(5)
+		return nil
+	end,
 }
 
 function FeelController.play(name: string, context: { [string]: any }?)

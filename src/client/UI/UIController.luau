@@ -2,8 +2,11 @@
 --[[
 	UIController: minimal, functional placeholder UI built in code.
 
-	HUD:     coins (counts up), level bar (tweens), seed picker, menu buttons, toasts.
-	Panels:  Shop (seeds, upgrades, plots, skip), Basket (sell / enter fair), Fair (top 10).
+	HUD:     coins (counts up), level bar (filled by XP essence), seed picker,
+	         menu buttons, toasts.
+	Panels:  Shop (seeds, upgrades, plots, honest skips), Basket (sell / enter a
+	         fair), Fairs (hourly / daily / weekly), Champion, Ribbons.
+	Modals:  fair picker, results / replay cards, co-grow invites, naming.
 
 	Panels re-render from ClientState whenever a snapshot arrives. Every number
 	the UI shows (prices, upgrade costs) comes from the server snapshot so the
@@ -27,6 +30,12 @@ local Tweens = require(script.Parent.Parent.Feel.Tweens)
 local GardenController = require(script.Parent.Parent.Controllers.GardenController)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
+local Modal = require(script.Parent.Modal)
+local LevelBar = require(script.Parent.LevelBar)
+local FairPanel = require(script.Parent.FairPanel)
+local ChampionPanel = require(script.Parent.ChampionPanel)
+local RibbonPanel = require(script.Parent.RibbonPanel)
+local RibbonNames = require(script.Parent.RibbonNames)
 
 local UIController = {}
 
@@ -47,12 +56,33 @@ local REASONS: { [string]: string } = {
 	TooFast = "Whoa, slow down!",
 	ProductNotConfigured = "Skips aren't set up yet.",
 	PlotLocked = "Buy this plot first!",
+	SkipCapReached = "Champions can only be skipped once a week. Care for it instead!",
+	ShowRunning = "The weigh-in show is on! Enter the next fair.",
+	UnknownFair = "That fair isn't open.",
+	NotCoGrower = "Only its growers can care for this champion.",
+	NoCareNeeded = "Your champion is happy right now!",
+	TeamFull = "This champion already has a full team.",
+	AlreadyCoGrower = "They're already growing it with you!",
+	PlayerNotHere = "That player isn't in this server.",
+	InviteExpired = "That invite has expired.",
+	BadName = "Try a different name (1-20 letters).",
+	FilterFailed = "Couldn't check that name. Try another!",
+	NotChampion = "That's not a champion plot.",
+}
+
+local CARE_DONE: { [string]: string } = {
+	Water = "watered",
+	Pests = "picked off the bugs on",
+	Prop = "propped up",
+}
+local CARE_NEEDED: { [string]: string } = {
+	Water = "is thirsty!",
+	Pests = "has bugs on its leaves!",
+	Prop = "is so heavy it's leaning!",
 }
 
 local gui: ScreenGui
 local coinsLabel: TextLabel
-local levelLabel: TextLabel
-local levelFill: Frame
 local seedBar: Frame
 local toastHolder: Frame
 local panels: { [string]: CanvasGroup } = {}
@@ -218,7 +248,24 @@ renderers.Shop = function(body, data)
 	plotRow.LayoutOrder = nextOrder()
 	plotRow.Parent = body
 
-	-- Skip-the-wait (developer product) for anything still growing.
+	-- Skip-the-wait (developer product) for anything still growing. The shop is
+	-- honest about what a skip costs your champion.
+	section(body, "Skip the wait", nextOrder())
+	UIKit.label(
+		string.format(
+			"Champion skips left this week: %d. A skipped champion can't win Natural Grown, and care still beats skips.",
+			data.championSkipsLeft or 0
+		),
+		Theme.TextSize.Small,
+		{
+			LayoutOrder = nextOrder(),
+			Font = Theme.FontBody,
+			TextColor3 = Theme.Colors.TextMuted,
+			TextWrapped = true,
+			Size = UDim2.new(1, -8, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+		}
+	).Parent = body
 	local now = ClientState.now()
 	local plotIds = {}
 	for plotId in data.plots do
@@ -232,6 +279,7 @@ renderers.Shop = function(body, data)
 		local crop = Config.Crops[plant.cropId]
 		if crop then
 			local state = GrowthMath.evaluate(plant, crop, Config, now)
+			local isChampion = plant.champion == true
 			if not state.canHarvest then
 				local skip = UIKit.button("Skip", function()
 					local result = NetClient.request(Net.Actions.PromptSkip, { plotId = plotId })
@@ -240,9 +288,16 @@ renderers.Shop = function(body, data)
 						NetClient.request(Net.Actions.DebugSimulatePurchase, { product = "SkipGrowth", plotId = plotId })
 					end
 				end, { BackgroundColor3 = Theme.Colors.Gold, TextColor3 = Theme.Colors.Text })
+				if isChampion then
+					UIKit.setEnabled(skip, (data.championSkipsLeft or 0) > 0, Theme.Colors.Gold)
+				end
 				local row = UIKit.row(
-					string.format("Plot %s · %s", plotId, crop.displayName),
-					"Ripe in " .. Format.duration(state.secondsToRipe),
+					if isChampion
+						then "Champion · " .. crop.displayName
+						else string.format("Plot %s · %s", plotId, crop.displayName),
+					"Ripe in "
+						.. Format.duration(state.secondsToRipe)
+						.. (if isChampion and (plant.paidSkips or 0) == 0 then " · skipping ends Natural Grown" else ""),
 					{ skip }
 				)
 				row.LayoutOrder = nextOrder()
@@ -281,9 +336,12 @@ renderers.Market = function(body, data)
 			request(Net.Actions.SellProduce, { uid = item.uid })
 		end)
 		local enter = UIKit.button("Enter Fair", function()
-			request(Net.Actions.EnterFair, { uid = item.uid })
+			FairPanel.pick(item)
 		end, { BackgroundColor3 = Theme.Colors.Gold, TextColor3 = Theme.Colors.Text })
 		local tags = {}
+		if item.isChampion then
+			table.insert(tags, if item.name then "Champion \"" .. item.name .. "\"" else "Champion")
+		end
 		if item.isGiant then
 			table.insert(tags, "GIANT")
 		end
@@ -301,53 +359,13 @@ renderers.Market = function(body, data)
 end
 
 renderers.Fair = function(body, data)
-	local board = ClientState.leaderboard
-	local endsAt = data.fairEndsAt or 0
-	local entry = data.fair and data.fair.entries[tostring(data.fairWeek)]
-
-	local info = UIKit.card({ Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 0 }, {
-		UIKit.padding(12),
-		UIKit.list(Enum.FillDirection.Vertical, 4),
-	})
-	local countdown = UIKit.label("", Theme.TextSize.Large)
-	countdown.Name = "Countdown"
-	countdown.Parent = info
-	UIKit.label(
-		if entry
-			then string.format("Your entry: %s %s", Config.Crops[entry.cropId] and Config.Crops[entry.cropId].displayName or "", Format.weight(entry.weight))
-			else "You haven't entered yet. Pick your heaviest veggie from the Basket!",
-		Theme.TextSize.Body,
-		{ Font = Theme.FontBody, TextWrapped = true, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y }
-	).Parent = info
-	info.Parent = body
-
-	-- Live countdown while this panel is open.
-	task.spawn(function()
-		while countdown.Parent do
-			countdown.Text = "Judging in " .. Format.duration(endsAt - ClientState.now())
-			task.wait(1)
-		end
+	FairPanel.render(body, data, function()
+		renderPanel("Fair")
 	end)
-
-	for i, row in (board and board.rows) or {} do
-		local isMe = row.userId == localPlayer.UserId
-		local card = UIKit.card({
-			Size = UDim2.new(1, -8, 0, 44),
-			LayoutOrder = i,
-			BackgroundColor3 = if isMe then Theme.Colors.Gold else Theme.Colors.Surface,
-		}, {
-			UIKit.label(string.format("#%d  %s", row.rank, row.name), Theme.TextSize.Body, {
-				Position = UDim2.fromOffset(12, 10),
-			}),
-			UIKit.label(Format.weight(row.weight), Theme.TextSize.Body, {
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -12, 0, 10),
-				TextXAlignment = Enum.TextXAlignment.Right,
-			}),
-		})
-		card.Parent = body
-	end
 end
+
+renderers.Champion = ChampionPanel.render
+renderers.Ribbons = RibbonPanel.render
 
 ---------------------------------------------------------------------------
 -- HUD
@@ -375,28 +393,36 @@ local function buildHud()
 	coinCard.Parent = stats
 
 	local levelCard = UIKit.card({ Size = UDim2.fromOffset(200, 30), LayoutOrder = 2, ClipsDescendants = true })
-	levelFill = UIKit.new("Frame", {
+	local levelFill = UIKit.new("Frame", {
 		BackgroundColor3 = Theme.Colors.Primary,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(0, 1),
 		Parent = levelCard,
 	}, { UIKit.corner() })
-	levelLabel = UIKit.label("Lv 1", Theme.TextSize.Small, {
+	local levelLabel = UIKit.label("Lv 1", Theme.TextSize.Small, {
 		Position = UDim2.fromOffset(10, 6),
 		ZIndex = 2,
 	})
 	levelLabel.Parent = levelCard
 	levelCard.Parent = stats
+	LevelBar.mount(levelCard, levelFill, levelLabel)
 
 	-- Right: menu buttons.
 	local menu = UIKit.new("Frame", {
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -16, 0.5, 0),
-		Size = UDim2.fromOffset(120, 160),
+		Size = UDim2.fromOffset(120, 260),
 		Parent = gui,
 	}, { UIKit.list(Enum.FillDirection.Vertical, 10, Enum.HorizontalAlignment.Right) })
-	for i, entry in { { "Shop", "Shop" }, { "Basket", "Market" }, { "Fair", "Fair" } } do
+	local menuEntries = {
+		{ "Shop", "Shop" },
+		{ "Basket", "Market" },
+		{ "Fairs", "Fair" },
+		{ "Champion", "Champion" },
+		{ "Ribbons", "Ribbons" },
+	}
+	for i, entry in menuEntries do
 		local b = UIKit.button(entry[1], function()
 			if openPanel == entry[2] then
 				UIController.close()
@@ -425,8 +451,8 @@ local function buildHud()
 		Parent = gui,
 	}, { UIKit.list(Enum.FillDirection.Vertical, 6, Enum.HorizontalAlignment.Center) })
 
-	for _, name in { "Shop", "Market", "Fair" } do
-		local title = if name == "Market" then "Basket" elseif name == "Fair" then "Weigh-In Fair" else "Shop"
+	local titles = { Shop = "Shop", Market = "Basket", Fair = "Weigh-In Fairs", Champion = "Your Champion", Ribbons = "Ribbon Shed" }
+	for name, title in titles do
 		local panel, body = UIKit.panel(title, UDim2.fromScale(0.6, 0.7), UIController.close)
 		panel.Parent = gui
 		panels[name] = panel
@@ -468,9 +494,8 @@ local function onState(data: { [string]: any }, previous: { [string]: any }?)
 	end
 	shownCoins = data.coins
 
-	local need = math.max(1, data.xpToNext or 1)
-	levelLabel.Text = string.format("Lv %d  ·  %d / %d XP", data.level, data.xp, need)
-	Tweens.play(levelFill, Tweens.Ease.Slide, { Size = UDim2.fromScale(math.clamp(data.xp / need, 0, 1), 1) })
+	-- The bar waits for any essence still in the air, then settles.
+	LevelBar.setTarget(data.level, data.xp, data.xpToNext or 1)
 
 	renderSeedBar(data)
 	if openPanel then
@@ -487,19 +512,71 @@ local function onFeel(name: string, ctx: { [string]: any })
 		if ctx.isRecord then
 			UIController.toast("New personal record!", C.Gold)
 		end
+		if ctx.xp and ctx.xp > 0 then
+			LevelBar.essence(ctx.position, ctx.xp)
+		end
 	elseif name == Net.Feedback.Sold then
 		UIController.toast("+" .. Format.coins(ctx.coins) .. " Coins", C.Gold)
 	elseif name == Net.Feedback.FriendWateredYou then
 		UIController.toast(ctx.friendName .. " watered your garden!", C.Primary)
 	elseif name == Net.Feedback.YouWateredFriend then
 		UIController.toast(string.format("Watered %s's garden! +%d Coins", ctx.ownerName, ctx.coins), C.Primary)
+		if ctx.xp and ctx.xp > 0 then
+			LevelBar.essence(ctx.position, ctx.xp)
+		end
 	elseif name == Net.Feedback.LevelUp then
 		UIController.toast("Level " .. ctx.level .. "!", C.Accent, 3.5)
 	elseif name == Net.Feedback.FairEntered then
-		UIController.toast("Entered the fair with " .. Format.weight(ctx.weight) .. "!", C.Gold)
+		local text = string.format("Entered the %s with %s!", ctx.fairName or "fair", Format.weight(ctx.weight))
+		UIController.toast(text, C.Gold)
+		if ctx.divisions and #ctx.divisions > 1 then
+			UIController.toast("Competing in " .. table.concat(ctx.divisions, ", "), C.PrimaryDark, 3.5)
+		end
 	elseif name == Net.Feedback.FairReward then
-		local place = if ctx.rank then "#" .. ctx.rank else "Entrant"
-		UIController.toast(string.format("Fair results: %s! +%s Coins", place, Format.coins(ctx.coins)), C.Gold, 5)
+		FairPanel.showResults(ctx)
+	elseif name == Net.Feedback.ServerPrize then
+		local places = { "1st", "2nd", "3rd" }
+		UIController.toast(
+			string.format("%s place on the %s stage! +%s Coins", places[ctx.place] or "Top", ctx.fairName or "fair", Format.coins(ctx.coins)),
+			C.Gold,
+			5
+		)
+	elseif name == Net.Feedback.MailReceived then
+		local text = ctx.note or "You got mail!"
+		if ctx.coins and ctx.coins > 0 then
+			text ..= " +" .. Format.coins(ctx.coins) .. " Coins"
+		end
+		UIController.toast(text, C.Gold, 5)
+		if ctx.ribbon then
+			UIController.toast(RibbonNames.describe(ctx.ribbon), C.Accent, 5)
+		end
+	elseif name == Net.Feedback.CareNeeded then
+		local crop = Config.Crops[ctx.cropId]
+		local who = if ctx.ownerUserId == localPlayer.UserId then "Your champion" else "Your team's champion"
+		UIController.toast(string.format("%s %s %s", who, crop and crop.displayName or "", CARE_NEEDED[ctx.kind] or "needs you!"), C.Accent, 4)
+		if openPanel == "Champion" then
+			renderPanel("Champion")
+		end
+	elseif name == Net.Feedback.CareDone then
+		local mine = ctx.carerUserId == localPlayer.UserId
+		local who = if mine then "You" else (ctx.carerName or "A friend")
+		local bonus = if ctx.credit and ctx.credit < 1 then " (a bit late, still counts!)" else "!"
+		UIController.toast(string.format("%s %s the champion%s", who, CARE_DONE[ctx.kind] or "cared for", bonus), C.Primary)
+		if mine and ctx.xp and ctx.xp > 0 then
+			LevelBar.essence(ctx.position, ctx.xp)
+		end
+		if openPanel == "Champion" then
+			renderPanel("Champion")
+		end
+	elseif name == Net.Feedback.ChampionNamed then
+		UIController.toast("Say hello to " .. ctx.name .. "!", C.Accent)
+	elseif name == Net.Feedback.CoGrowInvite then
+		ChampionPanel.showInvite(ctx)
+	elseif name == Net.Feedback.CoGrowJoined then
+		local text = if ctx.ownerUserId == localPlayer.UserId
+			then ctx.coGrowerName .. " is growing your champion with you!"
+			else "You're growing " .. ctx.ownerName .. "'s champion together!"
+		UIController.toast(text, C.Primary, 4)
 	elseif name == Net.Feedback.StageChanged and ctx.to == "Giant" then
 		local crop = Config.Crops[ctx.cropId]
 		UIController.toast("Your " .. (crop and crop.displayName or "crop") .. " became a GIANT!", C.Accent)
@@ -525,6 +602,7 @@ end
 
 function UIController.start()
 	buildHud()
+	Modal.parent = localPlayer:WaitForChild("PlayerGui")
 	ClientState.Changed:Connect(onState)
 	ClientState.LeaderboardChanged:Connect(function()
 		if openPanel == "Fair" then

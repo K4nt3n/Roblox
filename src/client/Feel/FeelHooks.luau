@@ -35,6 +35,24 @@ FeelHooks.Sounds = {
 	FairReward = "",
 	WelcomeBack = "",
 	Denied = "",
+	-- XP essence: one burst sound, a soft tick per orb landing in the bar.
+	EssenceBurst = "",
+	EssenceTick = "",
+	-- Champion and grow together.
+	CareNeeded = "",
+	CareDone = "",
+	ChampionNamed = "",
+	CoGrowInvite = "",
+	CoGrowJoined = "",
+	MailReceived = "",
+	-- Live weigh-in shows.
+	FairDayAnnounce = "",
+	FairDayStart = "",
+	FairDrumroll = "",
+	FairWeighIn = "",
+	FairPodiumPop = "",
+	FairConfetti = "",
+	ServerPrize = "",
 } :: { [string]: string }
 
 FeelHooks.Animations = {
@@ -44,6 +62,8 @@ FeelHooks.Animations = {
 	Harvested = "",
 	HarvestedGiant = "",
 	FairEntered = "",
+	CareDone = "",
+	ServerPrize = "",
 } :: { [string]: string }
 
 FeelHooks.Particles = {
@@ -54,11 +74,16 @@ FeelHooks.Particles = {
 	Harvested = "",
 	HarvestedGiant = "",
 	LevelUp = "",
+	EssenceBurst = "",
+	CareDone = "",
+	FairWeighIn = "",
+	FairConfetti = "",
 } :: { [string]: string }
 
 -- Volume per event (default 0.5).
 FeelHooks.Volume = {
 	CoinTick = 0.25,
+	EssenceTick = 0.2,
 } :: { [string]: number }
 
 return FeelHooks

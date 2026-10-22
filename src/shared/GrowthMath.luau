@@ -25,6 +25,15 @@ export type Plant = {
 	sizeRoll: number,
 	-- True when this seed rolled the Giant gene.
 	gene: boolean,
+	-- Champion-only fields (see CareMath and Config.Champion).
+	champion: boolean?,
+	careInterval: number?,
+	careScore: number?,
+	care: { [string]: number }?,
+	name: string?,
+	coGrowers: { number }?,
+	-- Paid skips used on this plant (honest shop: Natural Grown needs 0).
+	paidSkips: number?,
 }
 
 export type Stage = "Seed" | "Sprout" | "Growing" | "Ripe" | "Giant"
@@ -111,8 +120,22 @@ function GrowthMath.stageFor(progress: number, giantProgress: number, growthConf
 	return "Seed"
 end
 
+--[[
+	The champion version of a crop: it keeps swelling all week and can get
+	bigger than the same crop grown normally.
+]]
+function GrowthMath.championDef(crop: any, championConfig: any): any
+	local def = table.clone(crop)
+	def.giantSeconds = math.max(crop.giantSeconds, championConfig.minGiantSeconds)
+	def.giantMultiplier = crop.giantMultiplier * championConfig.giantMultiplierBonus
+	return def
+end
+
 function GrowthMath.evaluate(plant: Plant, crop: any, config: any, now: number): GrowthState
 	local growth = config.Growth
+	if plant.champion then
+		crop = GrowthMath.championDef(crop, config.Champion)
+	end
 	local elapsed = GrowthMath.effectiveElapsed(plant, now)
 	local progress = clamp01(elapsed / crop.growSeconds)
 	local giantProgress = clamp01((elapsed - crop.growSeconds) / crop.giantSeconds)
@@ -126,6 +149,10 @@ function GrowthMath.evaluate(plant: Plant, crop: any, config: any, now: number):
 		weight = base * (1 + (crop.giantMultiplier - 1) * easeOutQuad(giantProgress))
 	end
 	weight *= GrowthMath.waterWeightMultiplier(plant, config.Watering)
+	if plant.champion then
+		-- Care beats luck: full care adds more than the Giant gene.
+		weight *= 1 + (plant.careScore or 0) * config.Champion.careBonusPerPoint
+	end
 
 	-- Convert remaining effective seconds back into real seconds.
 	local speed = math.max(plant.speed, 1e-6)

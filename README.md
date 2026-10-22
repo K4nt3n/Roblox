@@ -41,8 +41,13 @@ luau tests/run.luau
 | Harvest | Ripe crops can be harvested, or left to swell toward Giant size. Giant-gene seeds (rolled at planting) get extra size. | `GardenService:Harvest` |
 | Sell | Basket panel: sell one or sell all. Price = weight x price/kg x Market Stall upgrade x Giant bonus. | `EconomyService` |
 | Upgrade | Watering Can, Fertilizer, Green Thumb, Market Stall, plus extra plots. | `Config.Upgrades`, `EconomyService` |
-| Weekly fair | Enter your heaviest veggie once per week (a heavier one replaces it and the old one returns). Global top 10 is live; rewards are claimed on your next join after the week ends. | `FairService`, `shared/FairMath` |
-| Skip wait | Developer product stub. In Studio the Skip button simulates a purchase; set real ids in `Config.Monetization`. Receipts are idempotent. | `MonetizationService` |
+| Fairs | Three fairs run side by side: **Hourly**, **Daily** and the **Weekly Grand Fair**. "Enter Fair" in the Basket asks which one. One entry per fair per period; a heavier one replaces it and the old one returns. Bigger fairs judge more divisions and pay more (`Config.Fair.periods`). | `FairService`, `shared/FairMath` |
+| Live shows | When a fair rolls over, every server runs a weigh-in show: countdown banner, camera to the stage, each local entry weighed lightest to heaviest, podium prizes for this server, then the global top 3. Nobody entered? A short fallback card. Missed it? Results arrive as a replay card on your next join. Daily and weekly shows take the camera; the hourly one is an overlay with a "Watch the stage" button. | `FairDayService`, `FairDayController` |
+| Ribbons for everyone | Each veggie type has its own board, plus First-Timer, Most Improved, Natural Grown, Team Grown, Helpful Neighbor and the live-show podium. Ribbon ids look like `weekly:Blue:crop_pumpkin`. The Ribbons panel lists them. | `FairMath.divisionsForEntry`, `RibbonPanel` |
+| Champion | A big plot in front of your garden for the one veggie you raise all week. It grows bigger and for longer, and care needs (water, bugs, prop it up) pop up on a schedule. Handling them adds weight, so care beats the Giant gene. Name it (text filtered). **F** to care. | `ChampionService`, `shared/CareMath` |
+| Grow together | Invite up to two friends to co-grow your champion. They can water and care for it, are listed on its fair card, and get half its prize plus a team ribbon by mail, even if offline. | `ChampionService`, `MailService` |
+| XP essence | Harvesting, caring and watering a friend's garden send glowing orbs from the crop into the XP bar. The bar fills a step per orb and rolls over on level-up. | `Feel/EssenceFX`, `UI/LevelBar` |
+| Skip wait | Developer product stub. In Studio the Skip button simulates a purchase; set real ids in `Config.Monetization`. Receipts are idempotent. **Honest shop:** a champion can be skipped once per week, a skipped champion leaves Natural Grown, and the shop says so. | `MonetizationService` |
 | Welcome back | On join you get a summary of what ripened while you were away. | `GardenService:_sendWelcomeBack` |
 
 ## Architecture
@@ -53,7 +58,8 @@ src/
     Config.luau        every tunable
     GrowthMath.luau    plant/grow/water/skip math (timestamp based)
     EconomyMath.luau   prices, upgrades, XP
-    FairMath.luau      week ids, scores, reward tiers
+    FairMath.luau      fair periods, divisions, show phases, ribbon ids, tiers
+    CareMath.luau      champion care schedule and credit
     Format.luau        coins / kg / durations
     Net.luau           remote, action and feedback names
     Signal.luau        tiny event class
@@ -66,15 +72,20 @@ src/
       PlotService        garden slots, placeholder plots and stands, prompt routing, plot attributes
       GardenService      plant / water / harvest / skip, stage-change events, welcome back
       EconomyService     coins, XP, seed shop, upgrades, plots, selling
-      FairService        weekly weigh-in, OrderedDataStore board, rewards
-      MonetizationService  dev products and receipts
+      ChampionService    champion setup, care needs, naming, co-grow invites
+      MailService        coins and ribbons for players who are offline or elsewhere
+      FairService        hourly/daily/weekly entries, a board per division, rewards
+      FairDayService     the live weigh-in show state machine
+      MonetizationService  dev products, receipts, champion skip cap, pass checks
   client/            StarterPlayerScripts.Client
     init.client.luau   starts Feel -> Garden -> UI, then listens for state
     ClientState.luau   latest snapshot + signals, server-synced clock
     NetClient.luau     request wrapper
     Feel/              game-feel layer (see below)
-    Controllers/       GardenController (crop visuals, prompts), CropVisuals (art seam)
-    UI/                Theme tokens, UIKit builders, UIController (HUD + panels)
+    Controllers/       GardenController (crop visuals, prompts, champion care), CropVisuals (art seam),
+                       FairDayController (live show: banner, camera, weigh-in, podium)
+    UI/                Theme, UIKit, UIController (HUD + panels), LevelBar, Modal,
+                       FairPanel, ChampionPanel, RibbonPanel
 tests/               pure-logic specs for the Luau CLI
 ```
 
@@ -101,7 +112,10 @@ system, not an afterthought.
   `LevelUp`, ...) and client events (`ButtonPress`, `PanelOpen`) into feel: code presets first,
   then any sound, animation or particle hook, then a `Played` signal the UI listens to.
 - `Feel/FeelHooks.luau` is the drop-in table for audio, animation and particle ids. Empty means
-  silent; fill an id and it plays, no code change.
+  silent; fill an id and it plays, no code change. Show and champion moments have hooks too
+  (`FairDrumroll`, `FairWeighIn`, `FairConfetti`, `CareNeeded`, `EssenceTick`, ...).
+- `Feel/EssenceFX.luau` flies XP orbs from a world point into a UI target. `UI/LevelBar.luau` holds
+  the bar's target while orbs are in the air, so XP never snaps.
 
 ## Art seams
 
@@ -113,6 +127,9 @@ system, not an afterthought.
 | Garden positions | `Workspace.GardenSlots.<1..8>` parts | Generated grid |
 | Shop / market / fair stands | `Workspace.Stands.<SeedShop/Market/FairStand>` parts | Placeholder blocks |
 | Map | Any `Workspace.Map` or `Workspace.Baseplate` | Generated ground |
+| Fair stage | `Workspace.FairStage` with parts `Floor`, `Scale` and `CameraPoint` (the camera looks along it) | Generated stage |
+| Essence orbs | Set `EssenceFX.template` to a GuiObject (e.g. a sparkle ImageLabel) | Glowing round frames |
+| Ribbons | Ribbon images per color in `RibbonPanel` | Colored dots |
 | UI look | `UI/Theme.luau` tokens and `UI/UIKit.luau` builders | Rounded placeholder UI |
 
 ## Tuning
@@ -122,6 +139,9 @@ cooldowns, upgrade curves, plot costs, XP curve, fair tiers, rate limits. Unit t
 tables stay consistent (for example each upgrade has one more value than costs).
 
 ## Known gaps (tracked in the timeline)
+
+- Game passes in `Config.Monetization.Passes` have no ids yet (`passId = 0`), so ownership checks return false.
+- The hourly show runs in every server every hour; tune or turn it into banner-only after playtests (R9).
 
 - Purchases are granted before the profile is force-saved (timeline M1).
 - No tutorial, daily streak, or settings menu yet.

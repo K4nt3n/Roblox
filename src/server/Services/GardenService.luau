@@ -19,6 +19,7 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Net)
 local GrowthMath = require(Shared.GrowthMath)
 local EconomyMath = require(Shared.EconomyMath)
+local FairMath = require(Shared.FairMath)
 
 local GardenService = {}
 
@@ -85,7 +86,9 @@ function GardenService:Start()
 			return
 		end
 		local ok, reason
-		if owner == player and kind == "Main" then
+		if kind == "Care" then
+			ok, reason = Services.ChampionService:Care(player, owner, plotId)
+		elseif owner == player and kind == "Main" then
 			ok, reason = self:PrimaryAction(player, plotId)
 		else
 			ok, reason = self:Water(player, owner, plotId)
@@ -189,7 +192,8 @@ function GardenService:PrimaryAction(player: Player, plotId: string): (boolean, 
 		return false, "NotLoaded"
 	end
 	local index = tonumber(plotId)
-	if not index or index > data.ownedPlots then
+	local isChampionPlot = plotId == Config.Champion.plotId
+	if not isChampionPlot and (not index or index > data.ownedPlots) then
 		if index == data.ownedPlots + 1 then
 			return Services.EconomyService:BuyPlot(player)
 		end
@@ -213,7 +217,8 @@ function GardenService:Plant(player: Player, plotId: string, cropId: string): (b
 		return false, "NotLoaded"
 	end
 	local index = tonumber(plotId)
-	if not index or index < 1 or index > data.ownedPlots then
+	local isChampionPlot = plotId == Config.Champion.plotId
+	if not isChampionPlot and (not index or index < 1 or index > data.ownedPlots) then
 		return false, "PlotLocked"
 	end
 	if data.plots[plotId] then
@@ -242,12 +247,20 @@ function GardenService:Plant(player: Player, plotId: string, cropId: string): (b
 		rng:NextNumber(),
 		rng:NextNumber()
 	)
+	if isChampionPlot then
+		Services.ChampionService:SetupChampion(plant, crop)
+	end
 	data.plots[plotId] = plant
 	lastStages[player] = lastStages[player] or {}
 	lastStages[player][plotId] = "Seed"
 
 	Services.PlotService:SyncPlot(player, plotId, plant, false)
-	Services.NetService:Feedback(player, Net.Feedback.Planted, { plotId = plotId, cropId = cropId, gene = plant.gene })
+	Services.NetService:Feedback(player, Net.Feedback.Planted, {
+		plotId = plotId,
+		cropId = cropId,
+		gene = plant.gene,
+		champion = isChampionPlot,
+	})
 	DataService:MarkDirty(player)
 	return true, nil
 end
@@ -296,15 +309,21 @@ function GardenService:Water(waterer: Player, owner: Player, plotId: string): (b
 	-- The waterer's can upgrade powers the boost, so good friends are worth having.
 	local canMult = Services.EconomyService:GetUpgradeValue(waterer, "wateringCan")
 	local boost = GrowthMath.applyWater(plant, crop, Config, now, canMult)
+	-- Watering also answers a champion's "Water" care need.
+	local careCredit = if plant.champion then Services.ChampionService:OnWatered(waterer, owner, plotId, plant) else nil
 	Services.PlotService:SyncPlot(owner, plotId, plant, false)
 
 	if isSelf then
-		NetService:Feedback(owner, Net.Feedback.Watered, { plotId = plotId, boost = boost, cropId = plant.cropId })
+		NetService:Feedback(owner, Net.Feedback.Watered, { plotId = plotId, boost = boost, cropId = plant.cropId, care = careCredit })
 	else
 		local key = tostring(owner.UserId)
 		local log = watererData.friendWaterLog
 		log.targets[key] = (log.targets[key] or 0) + 1
 		watererData.stats.friendWaters += 1
+		-- Helpful Neighbor division counts friend waters per fair week.
+		local weekKey = tostring(FairMath.weekId(now, Config.Fair))
+		watererData.fair.helper[weekKey] = (watererData.fair.helper[weekKey] or 0) + 1
+		Services.FairService:MarkHelperDirty(waterer)
 		Services.EconomyService:AddCoins(waterer, Config.Watering.friendRewardCoins, "FriendWater")
 		Services.EconomyService:AddXp(waterer, Config.Levels.xpPerFriendWater)
 		NetService:Feedback(waterer, Net.Feedback.YouWateredFriend, {
@@ -312,6 +331,8 @@ function GardenService:Water(waterer: Player, owner: Player, plotId: string): (b
 			plotId = plotId,
 			coins = Config.Watering.friendRewardCoins,
 			ownerUserId = owner.UserId,
+			xp = Config.Levels.xpPerFriendWater,
+			care = careCredit,
 		})
 		NetService:Feedback(owner, Net.Feedback.FriendWateredYou, {
 			friendName = waterer.DisplayName,
@@ -356,6 +377,13 @@ function GardenService:Harvest(player: Player, plotId: string): (boolean, any)
 		gene = plant.gene,
 		harvestedAt = os.time(),
 	}
+	if plant.champion then
+		item.isChampion = true
+		item.name = plant.name
+		item.coGrowers = plant.coGrowers
+		item.careScore = plant.careScore
+		item.paidSkips = plant.paidSkips or 0
+	end
 	data.nextUid += 1
 	table.insert(data.produce, item)
 	data.plots[plotId] = nil
@@ -370,14 +398,17 @@ function GardenService:Harvest(player: Player, plotId: string): (boolean, any)
 	end
 
 	Services.PlotService:SyncPlot(player, plotId, nil, false)
-	Services.EconomyService:AddXp(player, EconomyMath.harvestXp(weight, Config.Levels))
+	local xp = EconomyMath.harvestXp(weight, Config.Levels)
+	Services.EconomyService:AddXp(player, xp)
 	Services.NetService:Feedback(player, Net.Feedback.Harvested, {
 		plotId = plotId,
 		cropId = item.cropId,
 		weight = weight,
 		isGiant = item.isGiant,
 		isRecord = isRecord,
+		isChampion = item.isChampion,
 		uid = item.uid,
+		xp = xp,
 	})
 	DataService:MarkDirty(player)
 	return true, item
@@ -396,7 +427,8 @@ function GardenService:SkipGrowth(player: Player, plotId: string?): string?
 	else
 		-- No (valid) target chosen: skip the plant with the longest wait left.
 		for id, plant in data.plots do
-			local crop = Config.Crops[plant.cropId]
+			-- Never spend a skip on the champion unless the player picked it (honest shop).
+			local crop = not plant.champion and Config.Crops[plant.cropId]
 			local remaining = crop and GrowthMath.skipSecondsNeeded(plant, crop, now) or 0
 			if remaining > bestRemaining then
 				target, bestRemaining = id, remaining
@@ -409,6 +441,7 @@ function GardenService:SkipGrowth(player: Player, plotId: string?): string?
 	local plant = data.plots[target]
 	local crop = Config.Crops[plant.cropId]
 	GrowthMath.applySkip(plant, crop, now)
+	plant.paidSkips = (plant.paidSkips or 0) + 1
 	Services.PlotService:SyncPlot(player, target, plant, false)
 	Services.DataService:MarkDirty(player)
 	return target

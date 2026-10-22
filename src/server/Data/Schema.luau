@@ -36,11 +36,22 @@ function Schema.default(config: any): { [string]: any }
 		nextUid = 1,
 		upgrades = upgrades,
 		fair = {
-			-- weekId (string) -> { uid, cropId, weight }
-			entries = {},
-			-- weekId (string) -> true
-			claimed = {},
+			-- fair period ("hourly" | "daily" | "weekly") -> period id (string) ->
+			--   { weight, cropId, item, ctx = { isFirstTimer, previousBest } }
+			entries = { hourly = {}, daily = {}, weekly = {} },
+			-- period -> id -> true once rewards were handed out
+			claimed = { hourly = {}, daily = {}, weekly = {} },
+			-- period -> id -> true when the player watched that fair's live show
+			watched = { hourly = {}, daily = {}, weekly = {} },
+			-- weekly id (string) -> friend waters given that week (Helpful Neighbor division)
+			helper = {},
+			-- First week this player ever entered the weekly fair (First-Timer Class). 0 = never.
+			firstEntryWeek = 0,
+			-- Heaviest weekly entry from finished weeks (Most Improved).
+			bestEntryWeight = 0,
 		},
+		-- weekId (string) -> paid skips used on champions that week (honest shop cap)
+		championSkips = {},
 		-- ribbon id -> count
 		ribbons = {},
 		stats = {
