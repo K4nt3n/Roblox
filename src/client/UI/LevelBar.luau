@@ -48,8 +48,9 @@ local function setLabel(target: Target)
 end
 
 local function flash()
-	fill.BackgroundColor3 = Theme.Colors.Gold
-	Tweens.play(fill, TweenInfo.new(0.35, Enum.EasingStyle.Sine), { BackgroundColor3 = Theme.Colors.Primary })
+	-- Gold over the full bar, then a white flash across the whole pill.
+	Tweens.flash(fill, Theme.Colors.Gold, 0, 0.5)
+	Tweens.flash(card, Theme.Style.Flash, Theme.Style.FlashStrength, 0.6)
 end
 
 -- Moves the bar to the target, rolling over through a level-up if needed.

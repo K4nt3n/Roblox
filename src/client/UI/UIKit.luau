@@ -17,6 +17,12 @@
 	  UIKit.panel(title, size, onClose, options)  modal panel with header, art slot and body
 	  UIKit.tabs(parent, items, selected, onSelect)  segmented control with a sliding highlight
 	  UIKit.badge(parent)  + UIKit.setBadge(badge, value)  notification dot / count
+	Finish (all tuned in Theme.Style)
+	  UIKit.paint(gui, color)    candy gradient on a white base (call again to recolor)
+	  UIKit.outlineText(text)    dark outline around white text
+	  UIKit.gloss(gui)           glossy strip across the top half
+	  UIKit.sweep(gui)           a shine that sweeps across now and then (key buttons)
+	  UIKit.shadow(gui)          soft drop shadow (for things not inside a list layout)
 ]]
 
 local UserInputService = game:GetService("UserInputService")
@@ -92,6 +98,159 @@ function UIKit.shine(strength: number?): UIGradient
 	})
 end
 
+---------------------------------------------------------------------------
+-- Finish: gradients, outlines, gloss, shine, shadows
+---------------------------------------------------------------------------
+
+-- Candy gradient for `color` on a white base. Calling it again recolors (disabled, selected...).
+function UIKit.paint(gui: GuiObject, color: Color3)
+	gui.BackgroundColor3 = Color3.new(1, 1, 1)
+	gui:SetAttribute("PaintColor", color)
+	local gradient = gui:FindFirstChild("Paint") :: UIGradient?
+	if not gradient then
+		local old = gui:FindFirstChild("Shine")
+		if old then
+			old:Destroy()
+		end
+		gradient = UIKit.new("UIGradient", { Name = "Paint", Rotation = 90, Parent = gui })
+	end
+	(gradient :: UIGradient).Color = Theme.gradient(color)
+end
+
+-- The thick dark outline around a shape.
+function UIKit.outline(gui: GuiObject, thickness: number?, transparency: number?): UIStroke
+	local edge = gui:FindFirstChild("Edge") :: UIStroke?
+	if not edge then
+		local created = UIKit.stroke(Theme.Style.Outline, thickness or Theme.Style.OutlineThickness)
+		created.Name = "Edge"
+		created.Parent = gui
+		edge = created
+	end
+	local stroke = edge :: UIStroke
+	stroke.Color = Theme.Style.Outline
+	stroke.Thickness = thickness or Theme.Style.OutlineThickness
+	stroke.Transparency = transparency or 0
+	return stroke
+end
+
+-- Dark outline around text. Only shown when the text is light, so dark text stays clean.
+function UIKit.outlineText(text: GuiObject, thickness: number?): UIStroke
+	local existing = text:FindFirstChild("TextOutline") :: UIStroke?
+	if existing then
+		existing.Thickness = thickness or Theme.Style.TextOutline
+		return existing
+	end
+	local stroke: UIStroke = UIKit.new("UIStroke", {
+		Name = "TextOutline",
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+		Color = Theme.Style.Outline,
+		LineJoinMode = Enum.LineJoinMode.Round,
+		Thickness = thickness or Theme.Style.TextOutline,
+		Parent = text,
+	})
+	local function sync()
+		stroke.Enabled = Theme.wantsOutline((text :: any).TextColor3)
+	end
+	text:GetPropertyChangedSignal("TextColor3"):Connect(sync)
+	sync()
+	return stroke
+end
+
+-- Glossy highlight across the top half (fades out downward).
+function UIKit.gloss(gui: GuiObject)
+	if not Theme.Style.Gloss or gui:FindFirstChild("Gloss") then
+		return
+	end
+	local corner = gui:FindFirstChildOfClass("UICorner")
+	UIKit.new("Frame", {
+		Name = "Gloss",
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = Theme.Style.GlossTransparency,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(4, 3),
+		Size = UDim2.new(1, -8, 0.42, 0),
+		ZIndex = 2,
+		Active = false,
+		Parent = gui,
+	}, {
+		UIKit.corner(if corner then corner.CornerRadius else Theme.CornerSmall),
+		UIKit.new("UIGradient", {
+			Rotation = 90,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(1, 0.85),
+			}),
+		}),
+	})
+end
+
+-- A diagonal shine that sweeps across the element every few seconds while it exists.
+function UIKit.sweep(gui: GuiObject)
+	if gui:FindFirstChild("Sweep") then
+		return
+	end
+	local style = Theme.Style
+	local corner = gui:FindFirstChildOfClass("UICorner")
+	local band: UIGradient = UIKit.new("UIGradient", {
+		Rotation = 20,
+		Offset = Vector2.new(-1, 0),
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.4, 1),
+			NumberSequenceKeypoint.new(0.5, style.ShineTransparency),
+			NumberSequenceKeypoint.new(0.6, 1),
+			NumberSequenceKeypoint.new(1, 1),
+		}),
+	})
+	local overlay: Frame = UIKit.new("Frame", {
+		Name = "Sweep",
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 2,
+		Active = false,
+		Parent = gui,
+	}, { band, UIKit.corner(if corner then corner.CornerRadius else Theme.CornerSmall) })
+	local rng = Random.new()
+	task.spawn(function()
+		task.wait(rng:NextNumber(0.3, style.ShineEvery[1]))
+		while overlay.Parent do
+			if not Tweens.reducedMotion and gui.Visible then
+				band.Offset = Vector2.new(-1, 0)
+				Tweens.play(band, TweenInfo.new(style.ShineTime, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+					Offset = Vector2.new(1, 0),
+				})
+			end
+			task.wait(style.ShineTime + rng:NextNumber(style.ShineEvery[1], style.ShineEvery[2]))
+		end
+	end)
+end
+
+--[[
+	Soft drop shadow: a dark copy of the shape just below it. It is a sibling,
+	so only use it for elements that are not inside a list layout (wrap them
+	in a holder frame if they are).
+]]
+function UIKit.shadow(gui: GuiObject): Frame?
+	local parent = gui.Parent
+	if not parent then
+		return nil
+	end
+	local style = Theme.Style
+	local corner = gui:FindFirstChildOfClass("UICorner")
+	return UIKit.new("Frame", {
+		Name = gui.Name .. "Shadow",
+		BackgroundColor3 = style.ShadowColor,
+		BackgroundTransparency = style.ShadowTransparency,
+		BorderSizePixel = 0,
+		AnchorPoint = gui.AnchorPoint,
+		Position = gui.Position + UDim2.fromOffset(0, style.ShadowOffset),
+		Size = gui.Size,
+		ZIndex = gui.ZIndex - 1,
+		Parent = parent,
+	}, { UIKit.corner(if corner then corner.CornerRadius else Theme.Corner) })
+end
+
 function UIKit.label(text: string, size: number?, props: Props?): TextLabel
 	local label = UIKit.new("TextLabel", {
 		BackgroundTransparency = 1,
@@ -129,7 +288,8 @@ function UIKit.card(props: Props?, children: { Instance }?): Frame
 		BorderSizePixel = 0,
 	}, children)
 	UIKit.corner().Parent = frame
-	UIKit.stroke(Theme.Colors.SurfaceAlt, 2).Parent = frame
+	UIKit.outline(frame, 2.5, Theme.Style.CardOutlineTransparency)
+	UIKit.shine(0.08).Parent = frame
 	for key, value in props or {} do
 		(frame :: any)[key] = value
 	end
@@ -148,22 +308,14 @@ local selectionRing = UIKit.new("Frame", {
 	Position = UDim2.fromOffset(-5, -5),
 }, {
 	UIKit.corner(UDim.new(0, 14)),
-	UIKit.new("UIStroke", { Color = Theme.Colors.Gold, Thickness = 4 }),
+	UIKit.new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 4 }),
 })
 
 local function applyColors(button: TextButton, color: Color3, enabled: boolean)
-	local stroke = button:FindFirstChild("Edge") :: UIStroke?
-	if enabled then
-		button.BackgroundColor3 = color
-		if stroke then
-			stroke.Color = Theme.darken(color, 0.28)
-		end
-	else
-		button.BackgroundColor3 = Theme.Colors.Disabled
-		if stroke then
-			stroke.Color = Theme.darken(Theme.Colors.Disabled, 0.18)
-		end
+	if ArtSlot.asset("ButtonFace") then
+		return
 	end
+	UIKit.paint(button, if enabled then color else Theme.Colors.Disabled)
 end
 
 local function isEnabled(button: GuiButton): boolean
@@ -175,31 +327,54 @@ function UIKit.button(text: string, onClick: () -> (), props: Props?): TextButto
 	local color: Color3 = (props and props.BackgroundColor3) or Theme.Colors.Primary
 	local button = UIKit.new("TextButton", {
 		AutoButtonColor = false,
-		BackgroundColor3 = color,
 		BorderSizePixel = 0,
 		Font = Theme.Font,
 		Text = text,
 		TextSize = Theme.TextSize.Body,
 		TextColor3 = Theme.textOn(color),
+		-- The button's own text is hidden; a child label draws it above the gloss.
+		TextTransparency = 1,
 		Size = UDim2.fromOffset(120, Theme.Size.Touch),
 		Selectable = true,
 		SelectionImageObject = selectionRing,
 	})
 	UIKit.corner(Theme.CornerSmall).Parent = button
-	local edge = UIKit.stroke(Theme.darken(color, 0.28), 2)
-	edge.Name = "Edge"
-	edge.Parent = button
-	UIKit.shine().Parent = button
+	UIKit.outline(button)
 	button:SetAttribute("BaseColor", color)
 	for key, value in props or {} do
-		if key ~= "Parent" then
+		if key ~= "Parent" and key ~= "BackgroundColor3" then
 			(button :: any)[key] = value
 		end
 	end
-	if props and props.TextColor3 == nil then
-		button.TextColor3 = Theme.textOn(button.BackgroundColor3)
+	if not (props and props.TextColor3) then
+		button.TextColor3 = Theme.textOn(color)
 	end
-	ArtSlot.skin(button, "ButtonFace")
+	if not ArtSlot.skin(button, "ButtonFace") then
+		UIKit.paint(button, color)
+		UIKit.gloss(button)
+	end
+
+	-- Text above the gloss, mirrored from the button so callers can keep setting button.Text.
+	local label: TextLabel = UIKit.new("TextLabel", {
+		Name = "Label",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 3,
+		Active = false,
+		TextWrapped = true,
+		Parent = button,
+	}, { UIKit.new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }) })
+	local function mirror()
+		label.Text = button.Text
+		label.Font = button.Font
+		label.TextSize = button.TextSize
+		label.TextColor3 = button.TextColor3
+	end
+	mirror()
+	for _, property in { "Text", "Font", "TextSize", "TextColor3" } do
+		button:GetPropertyChangedSignal(property):Connect(mirror)
+	end
+	UIKit.outlineText(label)
 
 	local scale = Tweens.getScale(button)
 	local hovered = false
@@ -274,7 +449,17 @@ end
 function UIKit.setBusy(button: TextButton, busy: boolean)
 	button:SetAttribute("Busy", busy)
 	Tweens.play(button, Tweens.Ease.Fade, { BackgroundTransparency = if busy then 0.35 else 0 })
-	Tweens.play(button, Tweens.Ease.Fade, { TextTransparency = if busy then 0.4 else 0 })
+	local label = button:FindFirstChild("Label")
+	if label then
+		Tweens.play(label, Tweens.Ease.Fade, { TextTransparency = if busy then 0.4 else 0 })
+	end
+end
+
+-- A button with the shine sweep. Use for the few buttons that matter most.
+function UIKit.keyButton(text: string, onClick: () -> (), props: Props?): TextButton
+	local button = UIKit.button(text, onClick, props)
+	UIKit.sweep(button)
+	return button
 end
 
 --[[
@@ -293,6 +478,7 @@ function UIKit.requestButton(text: string, action: string, payload: { [string]: 
 			UIKit.setBusy(button, false)
 			if result.ok then
 				Tweens.pop(button, 0.12)
+				Tweens.flash(button, Theme.Style.Flash, 0.25, 0.3)
 			else
 				-- The server's Denied feedback already shows a toast saying why.
 				Tweens.shake(button)
@@ -317,7 +503,7 @@ function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 		Parent = parent,
 	}, {
 		UIKit.corner(Theme.CornerRound),
-		UIKit.stroke(Color3.new(1, 1, 1), 2),
+		UIKit.stroke(Theme.Style.Outline, 2.5),
 		UIKit.new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
 		UIKit.new("UISizeConstraint", { MinSize = Vector2.new(24, 24) }),
 	})
@@ -330,6 +516,8 @@ function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 		ZIndex = 6,
 		Parent = badge,
 	})
+	UIKit.paint(badge, color or Theme.Colors.Danger)
+	UIKit.outlineText(badge:FindFirstChild("Count") :: TextLabel, 2)
 	return badge
 end
 
@@ -376,22 +564,31 @@ export type Tabs = { frame: Frame, select: (id: string, animate: boolean?) -> ()
 	A segmented control. The highlight slides between tabs instead of
 	jumping. Persistent: build it once and call tabs.select(id) to sync.
 ]]
-function UIKit.tabs(parent: GuiObject, items: { TabItem }, selected: string, onSelect: (id: string) -> ()): Tabs
+function UIKit.tabs(
+	parent: GuiObject,
+	items: { TabItem },
+	selected: string,
+	onSelect: (id: string) -> (),
+	color: Color3?
+): Tabs
 	local frame = UIKit.new("Frame", {
 		Name = "Tabs",
-		BackgroundColor3 = Theme.Colors.SurfaceAlt,
+		BackgroundColor3 = Theme.darken(Theme.Colors.SurfaceAlt, 0.06),
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 44),
 		Parent = parent,
 	}, { UIKit.corner(Theme.CornerRound) })
+	UIKit.outline(frame, 3)
 	local highlight = UIKit.new("Frame", {
 		Name = "Highlight",
-		BackgroundColor3 = Theme.Colors.Surface,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1 / #items, -8, 1, -8),
 		Position = UDim2.new(0, 4, 0, 4),
 		Parent = frame,
-	}, { UIKit.corner(Theme.CornerRound), UIKit.stroke(Theme.Colors.Disabled, 2) })
+	}, { UIKit.corner(Theme.CornerRound) })
+	UIKit.paint(highlight, color or Theme.Colors.Primary)
+	UIKit.outline(highlight, 2.5)
+	UIKit.gloss(highlight)
 
 	local buttons: { [string]: TextButton } = {}
 	local current = ""
@@ -410,7 +607,7 @@ function UIKit.tabs(parent: GuiObject, items: { TabItem }, selected: string, onS
 			Tweens.play(highlight, Tweens.Ease.Slide, { Position = goal })
 		end
 		for itemId, b in buttons do
-			b.TextColor3 = if itemId == id then Theme.Colors.Text else Theme.Colors.TextMuted
+			b.TextColor3 = if itemId == id then Theme.Colors.TextOnPrimary else Theme.Colors.TextMuted
 		end
 	end
 
@@ -425,11 +622,12 @@ function UIKit.tabs(parent: GuiObject, items: { TabItem }, selected: string, onS
 			TextColor3 = Theme.Colors.TextMuted,
 			Size = UDim2.new(1 / #items, 0, 1, 0),
 			Position = UDim2.fromScale((i - 1) / #items, 0),
-			ZIndex = 2,
+			ZIndex = 3,
 			Selectable = true,
 			SelectionImageObject = selectionRing,
 			Parent = frame,
 		})
+		UIKit.outlineText(b, 2)
 		b.Activated:Connect(function()
 			if current == item.id then
 				return
@@ -474,13 +672,21 @@ function UIKit.panel(
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = size,
-		BackgroundColor3 = Theme.Colors.Background,
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		BorderSizePixel = 0,
 		Visible = false,
 	})
-	UIKit.corner(UDim.new(0, 20)).Parent = panel
+	panel:SetAttribute("Accent", accent)
+	UIKit.corner(UDim.new(0, 22)).Parent = panel
 	if not ArtSlot.skin(panel, "PanelFrame") then
-		UIKit.stroke(Theme.darken(accent, 0.25), 3).Parent = panel
+		UIKit.outline(panel, Theme.Style.PanelOutlineThickness)
+		-- Body tinted with the panel's color, fading to cream.
+		UIKit.new("UIGradient", {
+			Name = "Paint",
+			Rotation = 90,
+			Color = ColorSequence.new(Theme.lighten(accent, 0.78), Theme.Colors.Background),
+			Parent = panel,
+		})
 	end
 	UIKit.new("UISizeConstraint", { MaxSize = Theme.Size.PanelMax }).Parent = panel
 
@@ -490,28 +696,45 @@ function UIKit.panel(
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 64),
 		Parent = panel,
-	}, { UIKit.shine(0.1) })
+	})
+	UIKit.paint(header, accent)
+	UIKit.gloss(header)
+	-- Dark line under the header, as if the outline runs across the panel.
+	UIKit.new("Frame", {
+		Name = "HeaderLine",
+		BackgroundColor3 = Theme.Style.Outline,
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 3),
+		ZIndex = 3,
+		Parent = header,
+	})
 	ArtSlot.icon(opts.artSlot or ("PanelIcon_" .. title), {
 		size = 44,
 		color = Theme.lighten(accent, 0.35),
 		glyph = opts.glyph or string.sub(title, 1, 1),
 		anchor = Vector2.new(0, 0.5),
 		position = UDim2.new(0, 14, 0.5, 0),
+		zIndex = 3,
 	}).Parent =
 		header
-	UIKit.label(title, Theme.TextSize.Title, {
+	local titleLabel = UIKit.label(title, Theme.TextSize.Title, {
 		Name = "Title",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 68, 0.5, 0),
-		TextColor3 = Theme.textOn(accent),
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		ZIndex = 3,
 		Parent = header,
 	})
+	UIKit.outlineText(titleLabel, Theme.Style.TitleOutline)
 	local close = UIKit.button("X", onClose, {
 		Name = "Close",
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
 		Size = UDim2.fromOffset(44, 44),
 		BackgroundColor3 = Theme.Colors.Danger,
+		ZIndex = 3,
 		Parent = header,
 	})
 	local closeCorner = close:FindFirstChildOfClass("UICorner")
@@ -560,7 +783,8 @@ function UIKit.panelTabs(panel: CanvasGroup, items: { TabItem }, selected: strin
 	slot.Size = UDim2.new(1, -28, 0, 44)
 	body.Position = UDim2.fromOffset(12, 128)
 	body.Size = UDim2.new(1, -24, 1, -140)
-	return UIKit.tabs(slot, items, selected, onSelect)
+	local accent = panel:GetAttribute("Accent")
+	return UIKit.tabs(slot, items, selected, onSelect, if typeof(accent) == "Color3" then accent else nil)
 end
 
 -- A horizontal row card: optional icon, left text, right buttons.

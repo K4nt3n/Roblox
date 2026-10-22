@@ -52,7 +52,7 @@ local seedScroller: ScrollingFrame
 local seedDock: Frame
 local menuButtons: { [string]: TextButton } = {}
 local menuBadges: { [string]: Frame } = {}
-local seedSlots: { [string]: { holder: Frame, button: TextButton, count: TextLabel, edge: UIStroke, selected: boolean } } =
+local seedSlots: { [string]: { holder: Frame, button: TextButton, count: TextLabel, edge: UIStroke, shadow: Frame?, selected: boolean } } =
 	{}
 
 local coinPending: number? = nil
@@ -92,46 +92,56 @@ local function buildStats()
 	-- Coins: a pill with the icon slot hanging off its left edge.
 	coinPill = UIKit.new("Frame", {
 		Name = "Coins",
-		BackgroundColor3 = Theme.Colors.Surface,
 		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(18, 4),
 		Size = UDim2.fromOffset(Theme.Size.PillWidth - 18, 44),
+		ZIndex = 2,
 		Parent = stats,
-	}, { UIKit.corner(Theme.CornerRound), UIKit.stroke(Theme.darken(Theme.Colors.Gold, 0.15), 3), UIKit.shine(0.06) })
+	}, { UIKit.corner(Theme.CornerRound) })
+	UIKit.paint(coinPill, Theme.Colors.Gold)
+	UIKit.outline(coinPill)
+	UIKit.gloss(coinPill)
+	UIKit.shadow(coinPill)
 	ArtSlot.icon("CoinIcon", {
-		size = 52,
+		size = 54,
 		round = true,
 		color = Theme.Colors.Gold,
 		glyph = "C",
 		anchor = Vector2.new(0.5, 0.5),
 		position = UDim2.new(0, 0, 0.5, 0),
-		zIndex = 2,
+		zIndex = 3,
 	}).Parent =
 		coinPill
-	local coinsLabel = UIKit.label("0", Theme.TextSize.Large, {
+	local coinsLabel = UIKit.label("0", Theme.TextSize.Large + 4, {
 		Name = "Amount",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 36, 0.5, 0),
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		ZIndex = 3,
 		Parent = coinPill,
 	})
+	UIKit.outlineText(coinsLabel, Theme.Style.TitleOutline)
 	coinCounter = Counter.new(coinsLabel, function(n)
 		return Format.coins(math.floor(n + 0.5))
 	end, {
 		popTarget = coinPill,
 		floatParent = coinPill,
-		gainColor = Theme.darken(Theme.Colors.Gold, 0.35),
+		gainColor = Theme.Colors.Gold,
 		tick = "CoinTick",
 	})
 
 	-- Level: a badge with the number, and the XP bar.
 	levelPill = UIKit.new("Frame", {
 		Name = "Level",
-		BackgroundColor3 = Theme.Colors.Surface,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(18, 58),
+		Position = UDim2.fromOffset(18, 60),
 		Size = UDim2.fromOffset(Theme.Size.PillWidth - 18, 36),
+		ZIndex = 2,
 		Parent = stats,
-	}, { UIKit.corner(Theme.CornerRound), UIKit.stroke(Theme.darken(Theme.Colors.Primary, 0.2), 3) })
+	}, { UIKit.corner(Theme.CornerRound) })
+	UIKit.paint(levelPill, Theme.lighten(Theme.Style.Outline, 0.18))
+	UIKit.outline(levelPill)
+	UIKit.shadow(levelPill)
 	local badge = ArtSlot.icon("LevelIcon", {
 		size = 46,
 		round = true,
@@ -148,34 +158,37 @@ local function buildStats()
 		Position = UDim2.fromScale(0.5, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextColor3 = Theme.Colors.TextOnPrimary,
-		TextStrokeTransparency = 0.6,
 		ZIndex = 4,
 		Parent = badge,
 	})
+	UIKit.outlineText(levelNumber, Theme.Style.TitleOutline)
 	local track = UIKit.new("Frame", {
 		Name = "Track",
-		BackgroundColor3 = Theme.Colors.SurfaceAlt,
+		BackgroundColor3 = Theme.darken(Theme.Style.Outline, 0.3),
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(30, 7),
-		Size = UDim2.new(1, -38, 1, -14),
+		Position = UDim2.fromOffset(30, 6),
+		Size = UDim2.new(1, -37, 1, -12),
 		ClipsDescendants = true,
 		Parent = levelPill,
 	}, { UIKit.corner(Theme.CornerRound) })
 	local fill = UIKit.new("Frame", {
 		Name = "Fill",
-		BackgroundColor3 = Theme.Colors.Primary,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(0, 1),
 		Parent = track,
-	}, { UIKit.corner(Theme.CornerRound), UIKit.shine(0.15) })
+	}, { UIKit.corner(Theme.CornerRound) })
+	UIKit.paint(fill, Theme.Colors.Primary)
+	UIKit.gloss(fill)
 	local xpLabel = UIKit.label("", Theme.TextSize.Small, {
 		Name = "Xp",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		TextXAlignment = Enum.TextXAlignment.Center,
-		ZIndex = 2,
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		ZIndex = 4,
 		Parent = track,
 	})
+	UIKit.outlineText(xpLabel, 2)
 	LevelBar.mount(levelPill, fill, xpLabel, levelNumber)
 end
 
@@ -197,7 +210,7 @@ local function buildMenu(onMenu: (panel: string) -> ())
 			Name = entry.panel,
 			LayoutOrder = i,
 			Size = UDim2.fromOffset(Theme.Size.MenuButton, Theme.Size.MenuButton),
-			BackgroundColor3 = Theme.Colors.Surface,
+			BackgroundColor3 = accent,
 		})
 		local corner = button:FindFirstChildOfClass("UICorner")
 		if corner then
@@ -205,19 +218,23 @@ local function buildMenu(onMenu: (panel: string) -> ())
 		end
 		ArtSlot.icon("Menu" .. entry.panel, {
 			size = 38,
-			color = accent,
+			color = Theme.lighten(accent, 0.35),
 			glyph = entry.glyph,
 			anchor = Vector2.new(0.5, 0),
-			position = UDim2.new(0.5, 0, 0, 7),
+			position = UDim2.new(0.5, 0, 0, 6),
+			zIndex = 3,
 		}).Parent =
 			button
-		UIKit.label(entry.text, 13, {
+		local caption = UIKit.label(entry.text, 14, {
 			Name = "Caption",
 			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -4),
+			Position = UDim2.new(0.5, 0, 1, -3),
 			TextXAlignment = Enum.TextXAlignment.Center,
+			TextColor3 = Theme.Colors.TextOnPrimary,
+			ZIndex = 3,
 			Parent = button,
 		})
+		UIKit.outlineText(caption, 2)
 		button.Parent = menu
 		menuButtons[entry.panel] = button
 		menuBadges[entry.panel] = UIKit.badge(button)
@@ -260,13 +277,16 @@ local function layoutForDevice()
 		button.Size = UDim2.fromOffset(menuSize, menuSize)
 		local caption = button:FindFirstChild("Caption") :: TextLabel?
 		if caption then
-			caption.TextSize = if phone then 11 else 13
+			caption.TextSize = if phone then 12 else 14
 		end
 	end
 	local slotSize = if phone then Theme.Size.SeedSlotPhone else Theme.Size.SeedSlot
 	for _, slot in seedSlots do
 		slot.holder.Size = UDim2.fromOffset(slotSize, slotSize + 12)
 		slot.button.Size = UDim2.fromOffset(slotSize, slotSize)
+		if slot.shadow then
+			slot.shadow.Size = slot.button.Size
+		end
 	end
 	-- Keep the hotbar clear of the menu and, on touch screens, the thumbstick and jump button.
 	local rootWidth = root.AbsoluteSize.X / math.max(Scale.value, 0.01)
@@ -285,14 +305,16 @@ local function setSlotSelected(cropId: string, selected: boolean)
 	end
 	slot.selected = selected
 	Tweens.play(slot.button, Tweens.Ease.PanelIn, {
-		Position = UDim2.new(0.5, 0, 1, if selected then -10 else 0),
+		Position = UDim2.new(0.5, 0, 1, if selected then -16 else -6),
 	})
 	Tweens.play(slot.edge, Tweens.Ease.Hover, {
-		Color = if selected then Theme.Colors.Gold else Theme.Colors.SurfaceAlt,
-		Thickness = if selected then 4 else 2,
+		Color = if selected then Theme.Colors.Gold else Theme.Style.Outline,
+		Thickness = if selected then 5 else Theme.Style.OutlineThickness,
 	})
+	UIKit.paint(slot.button, if selected then Theme.lighten(Theme.Colors.Gold, 0.65) else Theme.Colors.Surface)
 	if selected then
 		Tweens.pop(slot.button, 0.12)
+		Tweens.flash(slot.button, Theme.Style.Flash, 0.3)
 	end
 end
 
@@ -311,13 +333,13 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 	end, {
 		Name = "Slot",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, 0),
+		Position = UDim2.new(0.5, 0, 1, -6),
 		Size = UDim2.fromOffset(size, size),
 		BackgroundColor3 = Theme.Colors.Surface,
 		Parent = holder,
 	})
 	local edge = button:FindFirstChild("Edge") :: UIStroke
-	edge.Color = Theme.Colors.SurfaceAlt
+	local shadow = UIKit.shadow(button)
 	ArtSlot.icon("Seed_" .. crop.id, {
 		size = 40,
 		round = true,
@@ -325,13 +347,15 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 		glyph = string.sub(crop.displayName, 1, 1),
 		anchor = Vector2.new(0.5, 0),
 		position = UDim2.new(0.5, 0, 0, 8),
+		zIndex = 3,
 	}).Parent =
 		button
-	UIKit.label(crop.displayName, 12, {
+	UIKit.label(crop.displayName, 13, {
 		Name = "Name",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -5),
 		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 3,
 		Parent = button,
 	})
 	local countBadge = UIKit.badge(button, Theme.Colors.PrimaryDark)
@@ -340,6 +364,7 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 		button = button,
 		count = countBadge:FindFirstChild("Count") :: TextLabel,
 		edge = edge,
+		shadow = shadow,
 		selected = false,
 	}
 end
@@ -431,9 +456,12 @@ function Hud.coinBurst(amount: number, from: Vector3 | Vector2 | nil)
 	coinCounter:float(amount)
 	EssenceFX.burst(from, coinPill, count, function(index, total)
 		Tweens.pop(coinPill, 0.05)
+		Tweens.flash(coinPill, Theme.Style.Flash, 0.6, 0.18)
 		coinCounter:step(base + amount * index / total)
 	end, function()
 		if EssenceFX.active("coins") == 0 then
+			Tweens.pop(coinPill, 0.14)
+			Tweens.flash(coinPill, Theme.Style.Flash, Theme.Style.FlashStrength)
 			local truth = coinPending
 			coinPending = nil
 			if truth then
@@ -441,6 +469,15 @@ function Hud.coinBurst(amount: number, from: Vector3 | Vector2 | nil)
 			end
 		end
 	end, { tag = "coins", color = Theme.Colors.Gold, glow = Theme.Colors.CoinGlow })
+end
+
+-- Reward moment on a HUD element: a bouncy pop and a bright flash.
+function Hud.celebrate(name: string, color: Color3?, strength: number?)
+	local target = Hud.target(name)
+	if target then
+		Tweens.pop(target, strength or 0.18)
+		Tweens.flash(target, color or Theme.Style.Flash, Theme.Style.FlashStrength)
+	end
 end
 
 function Hud.setBadge(panel: string, value: number | boolean | nil)

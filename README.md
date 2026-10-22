@@ -125,6 +125,11 @@ All UI is built in code, in design pixels at a 1280x720 reference.
 
 - `UI/Theme.luau`: colors, panel accents, spacing, text sizes, touch sizes, ScreenGui layers and the
   art slot table. Restyle the game here.
+- The look ("big Roblox game" shine) is all code and tuned in `Theme.Style`: candy palette, top-to-bottom
+  gradients with a darker bottom edge (`Theme.gradient`), thick dark outlines, white text with a dark
+  outline, a gloss strip on buttons, a shine that sweeps across key buttons (`UIKit.keyButton` /
+  `UIKit.sweep`), soft drop shadows under HUD pills and seed slots, and white/gold flashes with bouncy pops
+  on rewards (`Tweens.flash`, `Hud.celebrate`).
 - `UI/Scale.luau`: one responsive scale. `Scale.root(screenGui)` returns a scaled full-screen frame; phones,
   tablets and big monitors all get sensible sizes, and `Scale.device` drives layout changes (smaller menu
   and seed slots on phones, hotbar kept clear of the thumbstick and jump button).

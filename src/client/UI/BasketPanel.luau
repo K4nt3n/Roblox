@@ -31,6 +31,9 @@ function BasketPanel.render(body: ScrollingFrame, data: { [string]: any })
 	local sellAll =
 		UIKit.requestButton("Sell All", Net.Actions.SellAll, nil, { BackgroundColor3 = Theme.Colors.Accent })
 	UIKit.setEnabled(sellAll, #data.produce > 0, nil, "Your basket is empty. Harvest something!")
+	if #data.produce > 0 then
+		UIKit.sweep(sellAll)
+	end
 	local header = UIKit.row(
 		string.format("Basket (%d/%d)", #data.produce, Config.Economy.maxProduceInventory),
 		"Worth 0 Coins",
@@ -67,7 +70,7 @@ function BasketPanel.render(body: ScrollingFrame, data: { [string]: any })
 		local crop = Config.Crops[item.cropId]
 		local price = data.producePrices and data.producePrices[tostring(item.uid)] or 0
 		local sell = UIKit.requestButton(Format.coins(price), Net.Actions.SellProduce, { uid = item.uid })
-		local enter = UIKit.button("Enter Fair", function()
+		local enter = UIKit.keyButton("Enter Fair", function()
 			FairPanel.pick(item)
 		end, { BackgroundColor3 = Theme.Colors.Gold })
 		local tags = {}

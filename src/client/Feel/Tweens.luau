@@ -100,6 +100,48 @@ function Tweens.closePanel(gui: GuiObject)
 	end
 end
 
+-- Reward flash: a bright overlay that fades out over the element (keeps its rounded corners).
+-- Elements that lay out their children in a list get a pop instead (an overlay would join the list).
+function Tweens.flash(gui: GuiObject, color: Color3?, strength: number?, duration: number?)
+	if not gui.Parent then
+		return
+	end
+	if gui:FindFirstChildWhichIsA("UIGridStyleLayout") then
+		Tweens.pop(gui, 0.06)
+		return
+	end
+	local overlay = Instance.new("Frame")
+	overlay.Name = "Flash"
+	overlay.BorderSizePixel = 0
+	overlay.Size = UDim2.fromScale(1, 1)
+	local padding = gui:FindFirstChildOfClass("UIPadding")
+	if padding then
+		-- Cover the padded edge too.
+		local left, right = padding.PaddingLeft.Offset, padding.PaddingRight.Offset
+		local top, bottom = padding.PaddingTop.Offset, padding.PaddingBottom.Offset
+		overlay.Size = UDim2.new(1, left + right, 1, top + bottom)
+		overlay.Position = UDim2.fromOffset(-left, -top)
+	end
+	overlay.BackgroundColor3 = color or Color3.new(1, 1, 1)
+	overlay.BackgroundTransparency = strength or 0.15
+	overlay.ZIndex = 8
+	local corner = gui:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner:Clone().Parent = overlay
+	end
+	overlay.Parent = gui
+	local tween = Tweens.play(overlay, TweenInfo.new(duration or 0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		BackgroundTransparency = 1,
+	})
+	if tween then
+		tween.Completed:Once(function()
+			overlay:Destroy()
+		end)
+	else
+		overlay:Destroy()
+	end
+end
+
 -- Little horizontal "no" shake for a denied tap.
 local shaking: { [GuiObject]: boolean } = {}
 function Tweens.shake(gui: GuiObject, strength: number?)

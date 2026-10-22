@@ -62,10 +62,9 @@ local function remove(entry: Live)
 	if index then
 		table.remove(live, index)
 	end
+	-- Shrinks all the way away (outline and gloss included) while the slot closes.
 	local scale = Tweens.getScale(entry.card)
-	Tweens.play(scale, Tweens.Ease.PanelOut, { Scale = 0.6 })
-	Tweens.play(entry.card, Tweens.Ease.PanelOut, { BackgroundTransparency = 1 })
-	Tweens.play(entry.label, Tweens.Ease.PanelOut, { TextTransparency = 1 })
+	Tweens.play(scale, Tweens.Ease.PanelOut, { Scale = 0 })
 	local collapse = Tweens.play(entry.slot, Tweens.Ease.Collapse, { Size = UDim2.new(1, 0, 0, 0) })
 	task.delay(if collapse then 0.24 else 0, function()
 		entry.slot:Destroy()
@@ -93,22 +92,25 @@ local function show(text: string, options: Options, rank: number)
 		Position = UDim2.fromScale(0.5, 0),
 		Size = UDim2.fromOffset(0, 44),
 		AutomaticSize = Enum.AutomaticSize.X,
-		BackgroundColor3 = color or Theme.Colors.Surface,
 		Parent = slot,
 	}, {
-		UIKit.new("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }),
-		UIKit.shine(0.08),
+		UIKit.new("UIPadding", { PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18) }),
 	})
-	local stroke = card:FindFirstChildOfClass("UIStroke")
-	if stroke then
-		stroke.Color = Theme.darken(color or Theme.Colors.SurfaceAlt, 0.2)
+	local corner = card:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner.CornerRadius = Theme.CornerRound
 	end
-	local label = UIKit.label(text, Theme.TextSize.Body, {
+	UIKit.paint(card, color or Theme.Colors.Surface)
+	UIKit.outline(card)
+	UIKit.gloss(card)
+	local label = UIKit.label(text, Theme.TextSize.Body + 2, {
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.fromScale(0, 0.5),
 		TextColor3 = if color then Theme.textOn(color) else Theme.Colors.Text,
+		ZIndex = 3,
 		Parent = card,
 	})
+	UIKit.outlineText(label)
 	local entry: Live = {
 		text = text,
 		rank = rank,
@@ -125,6 +127,13 @@ local function show(text: string, options: Options, rank: number)
 	local scale = Tweens.getScale(card)
 	scale.Scale = 0.5
 	Tweens.play(scale, Tweens.Ease.PanelIn, { Scale = 1 })
+	if rank >= RANK.High then
+		-- Big news gets a bright flash and a second bounce.
+		Tweens.flash(card, Theme.Style.Flash, 0.05, 0.6)
+		task.delay(0.3, function()
+			Tweens.pop(card, 0.12)
+		end)
+	end
 
 	task.spawn(function()
 		while not entry.leaving do

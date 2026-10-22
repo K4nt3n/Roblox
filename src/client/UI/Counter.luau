@@ -78,13 +78,13 @@ function Counter.float(self: Counter, delta: number)
 	float.Size = UDim2.fromOffset(0, 24)
 	float.AutomaticSize = Enum.AutomaticSize.X
 	float.Font = Theme.Font
-	float.TextSize = Theme.TextSize.Body
+	float.TextSize = Theme.TextSize.Large
 	float.Text = text
 	float.TextColor3 = if delta > 0
-		then (opts.gainColor or Theme.Colors.PrimaryDark)
+		then (opts.gainColor or Theme.Colors.Primary)
 		else (opts.lossColor or Theme.Colors.Danger)
-	float.TextStrokeColor3 = Color3.new(1, 1, 1)
-	float.TextStrokeTransparency = 0.2
+	float.TextStrokeColor3 = Theme.Style.Outline
+	float.TextStrokeTransparency = 0
 	float.ZIndex = 10
 	float.Parent = parent
 	local start = float.Position
