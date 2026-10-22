@@ -475,10 +475,7 @@ local function onFeel(name: string, ctx: { [string]: any })
 		if ctx.xp and ctx.xp > 0 then
 			LevelBar.essence(ctx.position, ctx.xp)
 		end
-		local basket = Hud.target("Market")
-		if basket then
-			Tweens.pop(basket, 0.12)
-		end
+		Hud.celebrate("Market", nil, if ctx.isGiant then 0.25 else 0.12)
 	elseif name == Net.Feedback.Sold then
 		Hud.coinBurst(ctx.coins or 0, pressOrigin())
 	elseif name == Net.Feedback.FriendWateredYou then
@@ -490,6 +487,7 @@ local function onFeel(name: string, ctx: { [string]: any })
 		end
 	elseif name == Net.Feedback.LevelUp then
 		toast("Level " .. ctx.level .. "!", C.Accent, 3.5, "High")
+		Hud.celebrate("Level", C.Gold, 0.3)
 	elseif name == Net.Feedback.FairEntered then
 		local text = string.format("Entered the %s with %s!", ctx.fairName or "fair", Format.weight(ctx.weight))
 		toast(text, C.Gold)
@@ -499,6 +497,7 @@ local function onFeel(name: string, ctx: { [string]: any })
 	elseif name == Net.Feedback.FairReward then
 		FairPanel.showResults(ctx)
 	elseif name == Net.Feedback.ServerPrize then
+		Hud.celebrate("Coins", C.Gold, 0.25)
 		local places = { "1st", "2nd", "3rd" }
 		toast(
 			string.format(

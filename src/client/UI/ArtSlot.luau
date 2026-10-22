@@ -58,18 +58,19 @@ function ArtSlot.icon(slot: string, options: IconOptions?): GuiObject
 	else
 		local frame = Instance.new("Frame")
 		local color = opts.color or Theme.Colors.SurfaceAlt
-		frame.BackgroundColor3 = color
+		-- Same candy finish as the rest of the UI: gradient, dark outline.
+		frame.BackgroundColor3 = Color3.new(1, 1, 1)
 		corner(frame, if opts.round then Theme.CornerRound else UDim.new(0.28, 0))
 		local stroke = Instance.new("UIStroke")
-		stroke.Color = Theme.darken(color, 0.22)
-		stroke.Thickness = 2
+		stroke.Color = Theme.Style.Outline
+		stroke.Thickness = 2.5
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		stroke.Parent = frame
-		-- Soft top highlight keeps flat placeholders from looking dead.
-		local shine = Instance.new("UIGradient")
-		shine.Rotation = 90
-		shine.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(225, 225, 225))
-		shine.Parent = frame
+		local paint = Instance.new("UIGradient")
+		paint.Name = "Paint"
+		paint.Rotation = 90
+		paint.Color = Theme.gradient(color)
+		paint.Parent = frame
 		local glyph = Instance.new("TextLabel")
 		glyph.Name = "Glyph"
 		glyph.BackgroundTransparency = 1
@@ -77,7 +78,11 @@ function ArtSlot.icon(slot: string, options: IconOptions?): GuiObject
 		glyph.Font = Theme.Font
 		glyph.Text = opts.glyph or ""
 		glyph.TextScaled = true
-		glyph.TextColor3 = Theme.textOn(color)
+		glyph.TextColor3 = Theme.Colors.TextOnPrimary
+		local glyphOutline = Instance.new("UIStroke")
+		glyphOutline.Color = Theme.Style.Outline
+		glyphOutline.Thickness = 2
+		glyphOutline.Parent = glyph
 		local pad = Instance.new("UIPadding")
 		local inset = UDim.new(0.2, 0)
 		pad.PaddingTop, pad.PaddingBottom, pad.PaddingLeft, pad.PaddingRight = inset, inset, inset, inset

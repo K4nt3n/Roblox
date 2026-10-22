@@ -152,7 +152,8 @@ function ChampionPanel.render(body: ScrollingFrame, data: { [string]: any })
 		card
 	)
 
-	UIKit.button(if plant.name then "Rename" else "Name it", function()
+	local nameButton: (string, () -> (), { [string]: any }?) -> TextButton = if plant.name then UIKit.button else UIKit.keyButton
+	nameButton(if plant.name then "Rename" else "Name it", function()
 		ChampionPanel.openNamer(plant.name)
 	end, { LayoutOrder = 6, Size = UDim2.fromOffset(160, 40), BackgroundColor3 = Theme.Colors.Accent }).Parent = card
 

@@ -482,7 +482,10 @@ local function build()
 		Visible = false,
 		Parent = root,
 	}, { UIKit.padding(8) })
-	bannerText = UIKit.label("", Theme.TextSize.Body, { Parent = banner })
+	UIKit.paint(banner, Theme.Colors.Gold)
+	UIKit.outline(banner)
+	bannerText = UIKit.label("", Theme.TextSize.Body + 2, { TextColor3 = Theme.Colors.TextOnPrimary, Parent = banner })
+	UIKit.outlineText(bannerText)
 
 	stageCard = UIKit.new("CanvasGroup", {
 		Name = "StageCard",
@@ -495,8 +498,8 @@ local function build()
 		Visible = false,
 		Parent = root,
 	}, {
-		UIKit.corner(),
-		UIKit.stroke(Theme.Colors.Gold, 3),
+		UIKit.corner(UDim.new(0, 20)),
+		UIKit.stroke(Theme.Style.Outline, Theme.Style.PanelOutlineThickness),
 		UIKit.padding(14),
 		UIKit.list(Enum.FillDirection.Vertical, 6, Enum.HorizontalAlignment.Center),
 	})
@@ -517,6 +520,7 @@ local function build()
 		Visible = false,
 		Parent = root,
 	})
+	UIKit.sweep(watchButton)
 end
 
 function FairDayController.start()

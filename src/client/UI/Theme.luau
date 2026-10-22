@@ -9,28 +9,34 @@
 
 	Art seam: every icon, panel frame and button face Peter draws plugs into
 	Theme.Art below. Empty means the flat placeholder shape is drawn.
+
+	Look: bright candy colors, top-to-bottom gradients, thick dark outlines,
+	white text with a dark outline, a glossy strip on buttons and a shine
+	that sweeps across the important ones. All of it is tuned in Theme.Style.
 ]]
 
 local Theme = {}
 
+-- Candy palette: saturated, bright, and readable under a dark outline.
 Theme.Colors = {
-	Background = Color3.fromRGB(255, 248, 235),
+	Background = Color3.fromRGB(255, 250, 238),
 	Surface = Color3.fromRGB(255, 255, 255),
-	SurfaceAlt = Color3.fromRGB(245, 236, 220),
-	Primary = Color3.fromRGB(95, 190, 95),
-	PrimaryDark = Color3.fromRGB(60, 150, 70),
-	Accent = Color3.fromRGB(255, 170, 50),
-	Danger = Color3.fromRGB(235, 90, 80),
-	Gold = Color3.fromRGB(255, 205, 60),
-	Info = Color3.fromRGB(90, 160, 235),
-	Purple = Color3.fromRGB(165, 115, 225),
-	Text = Color3.fromRGB(60, 45, 35),
-	TextMuted = Color3.fromRGB(140, 120, 100),
+	SurfaceAlt = Color3.fromRGB(240, 234, 250),
+	Primary = Color3.fromRGB(70, 220, 85),
+	PrimaryDark = Color3.fromRGB(30, 165, 70),
+	Accent = Color3.fromRGB(255, 140, 25),
+	Danger = Color3.fromRGB(255, 70, 95),
+	Gold = Color3.fromRGB(255, 205, 25),
+	Info = Color3.fromRGB(40, 170, 255),
+	Purple = Color3.fromRGB(170, 90, 255),
+	Pink = Color3.fromRGB(255, 95, 190),
+	Text = Color3.fromRGB(40, 30, 60),
+	TextMuted = Color3.fromRGB(115, 100, 140),
 	TextOnPrimary = Color3.fromRGB(255, 255, 255),
-	Stroke = Color3.fromRGB(90, 65, 45),
-	Disabled = Color3.fromRGB(200, 195, 185),
-	DisabledText = Color3.fromRGB(150, 143, 132),
-	Backdrop = Color3.fromRGB(25, 20, 15),
+	Stroke = Color3.fromRGB(32, 24, 52),
+	Disabled = Color3.fromRGB(185, 182, 198),
+	DisabledText = Color3.fromRGB(245, 245, 250),
+	Backdrop = Color3.fromRGB(20, 12, 40),
 	Essence = Color3.fromRGB(150, 235, 120),
 	EssenceGlow = Color3.fromRGB(255, 245, 160),
 	CoinGlow = Color3.fromRGB(255, 240, 170),
@@ -43,6 +49,39 @@ Theme.PanelAccent = {
 	Fair = Theme.Colors.Gold,
 	Champion = Theme.Colors.Purple,
 	Ribbons = Theme.Colors.Info,
+}
+
+--[[
+	Style: the "big Roblox game" finish. Everything visual that is code (not
+	art) is tuned here: outlines, gradients, gloss, shadows, shine sweeps.
+]]
+Theme.Style = {
+	-- Thick dark outline around buttons, pills and panels.
+	Outline = Color3.fromRGB(32, 24, 52),
+	OutlineThickness = 3,
+	PanelOutlineThickness = 4,
+	-- Cards inside panels get a softer outline so panels don't get busy.
+	CardOutlineTransparency = 0.55,
+	-- White text with a dark outline on anything colored.
+	TextOutline = 2.5,
+	TitleOutline = 3.5,
+	-- Gradient: how much lighter the top and darker the bottom edge are.
+	GradientLight = 0.38,
+	GradientDark = 0.22,
+	-- Glossy strip across the top half of buttons.
+	Gloss = true,
+	GlossTransparency = 0.5,
+	-- Drop shadow under HUD pills, slots and toasts.
+	ShadowColor = Color3.fromRGB(20, 10, 45),
+	ShadowTransparency = 0.6,
+	ShadowOffset = 5,
+	-- Shine sweep on key buttons: seconds between sweeps, and sweep time.
+	ShineEvery = { 2.2, 4.2 },
+	ShineTime = 0.65,
+	ShineTransparency = 0.35,
+	-- Reward flash: overlay color and how strong it starts.
+	Flash = Color3.fromRGB(255, 255, 255),
+	FlashStrength = 0.15,
 }
 
 Theme.Font = Enum.Font.FredokaOne
@@ -136,10 +175,33 @@ function Theme.lighten(color: Color3, amount: number?): Color3
 	return color:Lerp(Color3.new(1, 1, 1), amount or 0.2)
 end
 
--- Readable text color for a given background.
+function Theme.luminance(color: Color3): number
+	return 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
+end
+
+-- Text color for a background: white (with an outline) on anything colored, dark on near-white.
 function Theme.textOn(color: Color3): Color3
-	local luminance = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
-	return if luminance > 0.72 then Theme.Colors.Text else Theme.Colors.TextOnPrimary
+	return if Theme.luminance(color) > 0.86 then Theme.Colors.Text else Theme.Colors.TextOnPrimary
+end
+
+-- True when text in this color should get the dark outline.
+function Theme.wantsOutline(textColor: Color3): boolean
+	return Theme.luminance(textColor) > 0.6
+end
+
+--[[
+	The candy gradient for a color: light top, the color itself through the
+	middle, and a darker band at the very bottom that reads as a 3D edge.
+	Used on a white BackgroundColor3 (UIGradient multiplies).
+]]
+function Theme.gradient(color: Color3): ColorSequence
+	local style = Theme.Style
+	return ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Theme.lighten(color, style.GradientLight)),
+		ColorSequenceKeypoint.new(0.45, color),
+		ColorSequenceKeypoint.new(0.82, Theme.darken(color, style.GradientDark * 0.4)),
+		ColorSequenceKeypoint.new(1, Theme.darken(color, style.GradientDark)),
+	})
 end
 
 return Theme

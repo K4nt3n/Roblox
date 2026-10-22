@@ -58,11 +58,12 @@ local function showNext()
 	end
 	showing = true
 	local spec = table.remove(queue, 1) :: Spec
+	local accent = spec.accent or Theme.Colors.Primary
 	local gui = getRoot(Modal.parent :: Instance)
 
 	local backdrop = UIKit.new("Frame", {
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundColor3 = Theme.Colors.Backdrop,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Parent = gui,
@@ -74,15 +75,19 @@ local function showNext()
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(Theme.Size.ModalWidth, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = Theme.Colors.Background,
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		BorderSizePixel = 0,
 		Parent = backdrop,
 	}, {
-		UIKit.corner(UDim.new(0, 20)),
-		UIKit.stroke(Theme.darken(spec.accent or Theme.Colors.Primary, 0.2), 3),
+		UIKit.corner(UDim.new(0, 22)),
 		UIKit.padding(18),
 		UIKit.list(Enum.FillDirection.Vertical, 10, Enum.HorizontalAlignment.Center),
+		UIKit.new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Theme.lighten(accent, 0.7), Theme.Colors.Background),
+		}),
 	})
+	UIKit.outline(card, Theme.Style.PanelOutlineThickness)
 
 	local closed = false
 	local function close()
@@ -103,13 +108,16 @@ local function showNext()
 		end)
 	end
 
-	UIKit.label(spec.title, Theme.TextSize.Title, {
+	local title = UIKit.label(spec.title, Theme.TextSize.Title, {
 		LayoutOrder = 1,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextWrapped = true,
+		TextColor3 = Theme.Colors.TextOnPrimary,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Size = UDim2.new(1, 0, 0, 0),
-	}).Parent = card
+	})
+	UIKit.outlineText(title, Theme.Style.TitleOutline)
+	title.Parent = card
 
 	for i, line in spec.lines or {} do
 		UIKit.label(line, Theme.TextSize.Body, {
@@ -156,13 +164,23 @@ local function showNext()
 			TextColor3 = b.textColor,
 		})
 		button.Parent = row
-		first = first or button
+		if not first then
+			-- The main choice shines.
+			UIKit.sweep(button)
+			first = button
+		end
 	end
 
 	if first and UIKit.usingGamepad() then
 		GuiService.SelectedObject = first
 	end
 	Tweens.openPanel(card)
+	if spec.accent then
+		-- Accent modals are moments (results, invites): bounce once more.
+		task.delay(0.28, function()
+			Tweens.pop(card, 0.06)
+		end)
+	end
 	FeelController.play("PanelOpen")
 end
 
