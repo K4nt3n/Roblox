@@ -9,7 +9,8 @@
 
 	Placeholder look: soft round frames with a glow stroke. Art seam: set
 	EssenceFX.template to a GuiObject (e.g. an ImageLabel with a sparkle) and
-	it is cloned for each orb instead.
+	it is cloned for each orb instead. Other streams (coins flying into the
+	coin counter) pass a style with their own color, tag and template.
 ]]
 
 local Players = game:GetService("Players")
@@ -45,7 +46,16 @@ type Orb = {
 	arrived: boolean,
 }
 
+export type Style = {
+	color: Color3?,
+	glow: Color3?,
+	-- Bursts are counted per tag, so coins in the air never hold up the XP bar.
+	tag: string?,
+	template: GuiObject?,
+}
+
 type Burst = {
+	tag: string,
 	orbs: { Orb },
 	target: GuiObject,
 	arrivedCount: number,
@@ -87,21 +97,25 @@ local function targetPoint(target: GuiObject): Vector2
 	return center
 end
 
-local function makeOrb(): GuiObject
-	if EssenceFX.template then
-		return EssenceFX.template:Clone()
+-- Screen point (essence layer coordinates) at the center of any GuiObject.
+EssenceFX.screenPoint = targetPoint
+
+local function makeOrb(style: Style?): GuiObject
+	local template = if style and style.template then style.template else EssenceFX.template
+	if template then
+		return template:Clone()
 	end
 	local size = between(ORB_SIZE)
 	local orb = Instance.new("Frame")
 	orb.AnchorPoint = Vector2.new(0.5, 0.5)
 	orb.Size = UDim2.fromOffset(size, size)
-	orb.BackgroundColor3 = EssenceFX.color
+	orb.BackgroundColor3 = (style and style.color) or EssenceFX.color
 	orb.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(1, 0)
 	corner.Parent = orb
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = EssenceFX.glow
+	stroke.Color = (style and style.glow) or EssenceFX.glow
 	stroke.Thickness = 3
 	stroke.Transparency = 0.35
 	stroke.Parent = orb
@@ -182,11 +196,14 @@ local function step()
 	end
 end
 
--- How many orbs are still in the air.
-function EssenceFX.active(): number
+-- How many orbs are still in the air (for one tag; "xp" is the default stream).
+function EssenceFX.active(tag: string?): number
+	local wanted = tag or "xp"
 	local count = 0
 	for _, burst in bursts do
-		count += #burst.orbs - burst.arrivedCount
+		if burst.tag == wanted then
+			count += #burst.orbs - burst.arrivedCount
+		end
 	end
 	return count
 end
@@ -204,7 +221,8 @@ function EssenceFX.burst(
 	target: GuiObject,
 	count: number,
 	onArrive: ((index: number, total: number) -> ())?,
-	onDone: (() -> ())?
+	onDone: (() -> ())?,
+	style: Style?
 )
 	local gui = getLayer()
 	local camera = workspace.CurrentCamera
@@ -234,7 +252,7 @@ function EssenceFX.burst(
 	local orbs = {}
 	local now = os.clock()
 	for i = 1, count do
-		local orbGui = makeOrb()
+		local orbGui = makeOrb(style)
 		orbGui.Visible = false
 		orbGui.Position = UDim2.fromOffset(origin.X, origin.Y)
 		local scale = Instance.new("UIScale")
@@ -257,7 +275,7 @@ function EssenceFX.burst(
 			arrived = false,
 		})
 	end
-	table.insert(bursts, { orbs = orbs, target = target, arrivedCount = 0, onArrive = onArrive, onDone = onDone })
+	table.insert(bursts, { tag = (style and style.tag) or "xp", orbs = orbs, target = target, arrivedCount = 0, onArrive = onArrive, onDone = onDone })
 	if not connection then
 		connection = RunService.RenderStepped:Connect(step)
 	end

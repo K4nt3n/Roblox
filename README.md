@@ -84,8 +84,9 @@ src/
     Feel/              game-feel layer (see below)
     Controllers/       GardenController (crop visuals, prompts, champion care), CropVisuals (art seam),
                        FairDayController (live show: banner, camera, weigh-in, podium)
-    UI/                Theme, UIKit, UIController (HUD + panels), LevelBar, Modal,
-                       FairPanel, ChampionPanel, RibbonPanel
+    UI/                Theme, Scale, ArtSlot, UIKit, Counter, Toasts (building blocks),
+                       Hud, UIController (panels + event routing), LevelBar, Modal,
+                       ShopPanel, BasketPanel, FairPanel, ChampionPanel, RibbonPanel
 tests/               pure-logic specs for the Luau CLI
 ```
 
@@ -115,7 +116,32 @@ system, not an afterthought.
   silent; fill an id and it plays, no code change. Show and champion moments have hooks too
   (`FairDrumroll`, `FairWeighIn`, `FairConfetti`, `CareNeeded`, `EssenceTick`, ...).
 - `Feel/EssenceFX.luau` flies XP orbs from a world point into a UI target. `UI/LevelBar.luau` holds
-  the bar's target while orbs are in the air, so XP never snaps.
+  the bar's target while orbs are in the air, so XP never snaps. The same effect flies coins from the
+  Sell button into the coin counter (tagged streams, so coins never hold up the XP bar).
+
+### The UI layer
+
+All UI is built in code, in design pixels at a 1280x720 reference.
+
+- `UI/Theme.luau`: colors, panel accents, spacing, text sizes, touch sizes, ScreenGui layers and the
+  art slot table. Restyle the game here.
+- `UI/Scale.luau`: one responsive scale. `Scale.root(screenGui)` returns a scaled full-screen frame; phones,
+  tablets and big monitors all get sensible sizes, and `Scale.device` drives layout changes (smaller menu
+  and seed slots on phones, hotbar kept clear of the thumbstick and jump button).
+  `Scale.setUserMultiplier` is the hook for a UI size setting.
+- `UI/UIKit.luau`: buttons (hover lift, press squash, release spring, gamepad selection ring),
+  disabled buttons that shake and say why when tapped, `requestButton` (busy while the server answers,
+  pop on success, shake on a denial), sliding tabs, badges, panels, rows.
+- `UI/Counter.luau`: numbers roll instead of snapping, bigger jumps roll longer, and gains float a "+250".
+- `UI/Toasts.luau`: priority queue (max 3 on screen, 2 on phones), repeats stack as "x3", leaving toasts
+  shrink their slot so the rest glide up.
+- `UI/Hud.luau`: coin pill, level pill, menu with badges (basket count, champion needs care, a fair waiting
+  for an entry, new ribbons), seed hotbar updated in place. `Hud.target(name)` / `UIController.target(name)`
+  give fly-to targets for effects (the harvest sequence in G4 can fly crops into `"Market"`).
+- `UI/UIController.luau`: one panel at a time over a dimmed, blurred backdrop. Tap outside, X or gamepad B
+  closes; opening another panel cross-fades; rows pop in one after another; re-renders keep the scroll
+  position. `UIController.registerPanel(name, spec)` adds new panels (settings, store, streak) with the
+  same feel.
 
 ## Art seams
 
@@ -129,8 +155,12 @@ system, not an afterthought.
 | Map | Any `Workspace.Map` or `Workspace.Baseplate` | Generated ground |
 | Fair stage | `Workspace.FairStage` with parts `Floor`, `Scale` and `CameraPoint` (the camera looks along it) | Generated stage |
 | Essence orbs | Set `EssenceFX.template` to a GuiObject (e.g. a sparkle ImageLabel) | Glowing round frames |
-| Ribbons | Ribbon images per color in `RibbonPanel` | Colored dots |
+| UI icons | Asset ids in `Theme.Art`: `CoinIcon`, `LevelIcon`, `Menu<Shop/Market/Fair/Champion/Ribbons>`, `PanelIcon_<panel>`, `ChampionPortrait`, plus `Seed_<cropId>`, `Upgrade_<id>`, `Ribbon_<color>`, `Medal_<1-3>` | Flat colored shapes with a letter |
+| UI frames | `Theme.Art.PanelFrame` / `ButtonFace` (9-slice, set `Theme.ArtSlice`) | Flat rounded frames |
 | UI look | `UI/Theme.luau` tokens and `UI/UIKit.luau` builders | Rounded placeholder UI |
+
+Every art slot instance is named `Art_<slot>` with an `ArtSlot` attribute, so it is easy to find in
+the Explorer. Set `ArtSlot.showLabels = true` to print slot names on the placeholders in Studio.
 
 ## Tuning
 
@@ -146,4 +176,5 @@ tables stay consistent (for example each upgrade has one more value than costs).
 - Purchases are granted before the profile is force-saved (timeline M1).
 - No tutorial, daily streak, or settings menu yet.
 - Fertilizer speed is locked in when a seed is planted, so buying it speeds up the next planting.
-- The UI re-renders an open panel on every snapshot; fine for a prototype, worth diffing later.
+- The UI rebuilds an open panel's rows on every snapshot (scroll position is kept). Rows are rebuilt in
+  the same frame so nothing jumps, but a button you are hovering loses its hover lift; keyed rows would fix it.

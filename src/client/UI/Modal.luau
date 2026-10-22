@@ -11,8 +11,11 @@
 	    })
 ]]
 
+local GuiService = game:GetService("GuiService")
+
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
+local Scale = require(script.Parent.Scale)
 local Tweens = require(script.Parent.Parent.Feel.Tweens)
 local FeelController = require(script.Parent.Parent.Feel.FeelController)
 
@@ -27,22 +30,24 @@ export type Spec = {
 	accent: Color3?,
 }
 
-local root: ScreenGui? = nil
+local root: Frame? = nil
 local queue: { Spec } = {}
 local showing = false
 
-local function getRoot(parent: Instance): ScreenGui
-	if root and root.Parent then
+local function getRoot(parent: Instance): Frame
+	if root and root.Parent and root.Parent.Parent then
 		return root
 	end
-	root = UIKit.new("ScreenGui", {
+	local screenGui = UIKit.new("ScreenGui", {
 		Name = "GVF_Modal",
 		ResetOnSpawn = false,
-		DisplayOrder = 20,
+		IgnoreGuiInset = true,
+		DisplayOrder = Theme.Layer.Modal,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = parent,
 	})
-	return root :: ScreenGui
+	root = Scale.root(screenGui, "Modal")
+	return root :: Frame
 end
 
 Modal.parent = nil :: Instance?
@@ -67,14 +72,14 @@ local function showNext()
 	local card = UIKit.new("CanvasGroup", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(420, 0),
+		Size = UDim2.fromOffset(Theme.Size.ModalWidth, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = Theme.Colors.Background,
 		BorderSizePixel = 0,
 		Parent = backdrop,
 	}, {
-		UIKit.corner(),
-		UIKit.stroke(spec.accent, 3),
+		UIKit.corner(UDim.new(0, 20)),
+		UIKit.stroke(Theme.darken(spec.accent or Theme.Colors.Primary, 0.2), 3),
 		UIKit.padding(18),
 		UIKit.list(Enum.FillDirection.Vertical, 10, Enum.HorizontalAlignment.Center),
 	})
@@ -85,6 +90,9 @@ local function showNext()
 			return
 		end
 		closed = true
+		if GuiService.SelectedObject and GuiService.SelectedObject:IsDescendantOf(card) then
+			GuiService.SelectedObject = nil
+		end
 		Tweens.play(backdrop, Tweens.Ease.Fade, { BackgroundTransparency = 1 })
 		local tween = Tweens.play(Tweens.getScale(card), Tweens.Ease.Fade, { Scale = 0.85 })
 		Tweens.play(card, Tweens.Ease.Fade, { GroupTransparency = 1 })
@@ -132,8 +140,9 @@ local function showNext()
 		Parent = card,
 	}, { UIKit.list(Enum.FillDirection.Horizontal, 10, Enum.HorizontalAlignment.Center) })
 	local buttons = spec.buttons or { { text = "OK" } }
+	local first: TextButton? = nil
 	for i, b in buttons do
-		UIKit.button(b.text, function()
+		local button = UIKit.button(b.text, function()
 			if b.onClick then
 				b.onClick()
 			end
@@ -144,10 +153,15 @@ local function showNext()
 			LayoutOrder = i,
 			Size = UDim2.fromOffset(150, 44),
 			BackgroundColor3 = b.color or Theme.Colors.Primary,
-			TextColor3 = b.textColor or Theme.Colors.TextOnPrimary,
-		}).Parent = row
+			TextColor3 = b.textColor,
+		})
+		button.Parent = row
+		first = first or button
 	end
 
+	if first and UIKit.usingGamepad() then
+		GuiService.SelectedObject = first
+	end
 	Tweens.openPanel(card)
 	FeelController.play("PanelOpen")
 end

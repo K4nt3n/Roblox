@@ -18,11 +18,16 @@ local NetClient = require(script.Parent.Parent.NetClient)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 local Modal = require(script.Parent.Modal)
+local ArtSlot = require(script.Parent.ArtSlot)
+local Counter = require(script.Parent.Counter)
 
 local ChampionPanel = {}
 
 local localPlayer = Players.LocalPlayer
 local CHAMPION = Config.Champion
+
+-- Last weight shown, so a re-render keeps rolling instead of restarting from zero.
+local lastWeight: number? = nil
 
 local CARE_TEXT = {
 	Water = "Thirsty! Water it (R or F)",
@@ -89,9 +94,38 @@ function ChampionPanel.render(body: ScrollingFrame, data: { [string]: any })
 	local now = ClientState.now()
 	local state = if crop then GrowthMath.evaluate(plant, crop, Config, now) else nil
 	local title = if plant.name then string.format("%s the %s", plant.name, crop and crop.displayName or "") else (crop and crop.displayName or "Champion")
-	UIKit.label(title, Theme.TextSize.Large, { LayoutOrder = 1 }).Parent = card
-	if state then
-		paragraph(string.format("%s · %s", Format.weight(state.weight), state.stage), 2, card)
+	local c = crop and crop.placeholderColor
+	ArtSlot.icon("ChampionPortrait", {
+		size = 96,
+		round = true,
+		color = if c then Color3.fromRGB(c[1], c[2], c[3]) else Theme.Colors.Purple,
+		glyph = if crop then string.sub(crop.displayName, 1, 1) else "?",
+		layoutOrder = -2,
+	}).Parent = card
+	UIKit.label(title, Theme.TextSize.Large, { LayoutOrder = -1 }).Parent = card
+	if state and crop then
+		-- The weight keeps rolling up while the panel is open: you can watch it grow.
+		local weightLabel = UIKit.label("", Theme.TextSize.Huge, { LayoutOrder = 1, TextColor3 = Theme.Colors.PrimaryDark })
+		weightLabel.Parent = card
+		local stageLabel = UIKit.label(state.stage, Theme.TextSize.Small, {
+			LayoutOrder = 2,
+			Font = Theme.FontBody,
+			TextColor3 = Theme.Colors.TextMuted,
+		})
+		stageLabel.Parent = card
+		local weight = Counter.new(weightLabel, Format.weight)
+		weight:set(lastWeight or state.weight, { instant = true })
+		task.spawn(function()
+			while weightLabel.Parent do
+				local live = GrowthMath.evaluate(plant, crop, Config, ClientState.now())
+				if live.stage ~= stageLabel.Text then
+					stageLabel.Text = live.stage
+				end
+				weight:set(live.weight, { quiet = true })
+				lastWeight = live.weight
+				task.wait(0.5)
+			end
+		end)
 	end
 
 	local careScore = plant.careScore or 0
