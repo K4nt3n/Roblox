@@ -67,6 +67,7 @@ function NetService:Init()
 	makeRemote("RemoteEvent", Net.Remotes.State)
 	makeRemote("RemoteEvent", Net.Remotes.Feedback)
 	makeRemote("RemoteEvent", Net.Remotes.Leaderboard)
+	makeRemote("RemoteEvent", Net.Remotes.FairDay)
 	folder.Parent = ReplicatedStorage
 end
 
