@@ -3,8 +3,8 @@
 	UIController: owns the screens and routes game events to them.
 
 	HUD:     UI/Hud (coins, level bar, menu with badges, seed hotbar, toasts).
-	Panels:  Shop + Sell (Market) (opened at the stands), Backpack, Upgrades,
-	         Settings, Fairs, Champion, Ribbons. One open at a
+	Panels:  Shop + Sell (Market) (opened at the stands), Backpack (seeds,
+	         supplies, ribbons), Upgrades, Settings, Fairs, Champion. One open at a
 	         time, over a dimmed, blurred backdrop. Tap outside, press X or
 	         gamepad B to close. Opening another panel cross-fades.
 	Modals:  fair picker, results / replay cards, co-grow invites, naming (UI/Modal).
@@ -52,7 +52,6 @@ local Icons = require(script.Parent.Icons)
 local PromptUI = require(script.Parent.PromptUI)
 local FairPanel = require(script.Parent.FairPanel)
 local ChampionPanel = require(script.Parent.ChampionPanel)
-local RibbonPanel = require(script.Parent.RibbonPanel)
 local RibbonNames = require(script.Parent.RibbonNames)
 
 local UIController = {}
@@ -188,6 +187,21 @@ local seenRibbons: number? = nil
 local CLOSE_ACTION = "GVF_ClosePanel"
 local BLUR_SIZE = 12
 
+local function ribbonTotal(data: { [string]: any }): number
+	local total = 0
+	for _, count in data.ribbons or {} do
+		total += count
+	end
+	return total
+end
+
+local function markRibbonsSeen()
+	if ClientState.data then
+		seenRibbons = ribbonTotal(ClientState.data)
+	end
+	Hud.setBadge("Backpack", false)
+end
+
 local function clearBody(body: ScrollingFrame)
 	for _, child in body:GetChildren() do
 		if child:IsA("GuiObject") then
@@ -206,6 +220,9 @@ local function renderPanel(name: string, keepScroll: boolean?)
 	local scroll = state.body.CanvasPosition
 	clearBody(state.body)
 	spec.render(state.body, data, state.tab)
+	if name == "Backpack" and state.tab == "ribbons" then
+		markRibbonsSeen()
+	end
 	if keepScroll then
 		-- The canvas re-measures next frame; put the scroll back after it does.
 		state.body.CanvasPosition = scroll
@@ -336,14 +353,6 @@ function UIController.open(name: string, tab: string?)
 	Tweens.stagger(rows, 0.03)
 	FeelController.play("PanelOpen")
 
-	if name == "Ribbons" and ClientState.data then
-		local total = 0
-		for _, count in ClientState.data.ribbons or {} do
-			total += count
-		end
-		seenRibbons = total
-		Hud.setBadge("Ribbons", false)
-	end
 	if UIKit.usingGamepad() then
 		GuiService.SelectedObject = firstSelectable(state.group)
 	end
@@ -414,11 +423,6 @@ local function registerBuiltIns()
 		title = "Your Champion",
 		glyph = "C",
 		render = ChampionPanel.render,
-	})
-	UIController.registerPanel("Ribbons", {
-		title = "Ribbon Shed",
-		glyph = "R",
-		render = RibbonPanel.render,
 	})
 	UIController.registerPanel("Backpack", {
 		title = "Backpack",
@@ -507,15 +511,13 @@ local function updateBadges()
 	end
 	Hud.setBadge("Fair", fairWaiting)
 
-	-- Ribbons: how many arrived since the shed was last opened.
-	local total = 0
-	for _, count in data.ribbons or {} do
-		total += count
-	end
+	-- Backpack: how many ribbons arrived since its Ribbons tab was last looked at.
+	local total = ribbonTotal(data)
 	if seenRibbons == nil then
 		seenRibbons = total
 	end
-	Hud.setBadge("Ribbons", if openPanel == "Ribbons" then false else total - (seenRibbons :: number))
+	local looking = openPanel == "Backpack" and panels.Backpack and panels.Backpack.tab == "ribbons"
+	Hud.setBadge("Backpack", if looking then false else total - (seenRibbons :: number))
 end
 
 local function onState(data: { [string]: any }, _previous: { [string]: any }?)

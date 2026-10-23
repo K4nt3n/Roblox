@@ -3,19 +3,20 @@
 	Hud: the always-on screen. Built once, then updated in place (no
 	rebuilds, so nothing jumps or loses its hover state).
 
-	  Top left     coin pill (rolls up, coins fly into it on a sale)
-	               gem pill (premium currency: not in the game yet, shown as "Soon")
-	               player card (avatar, name, level badge + XP bar filled by essence via LevelBar)
+	  Bottom left  stacked: gem pill (premium currency, "Soon" for now) on top,
+	               coin pill (rolls up, coins fly into it on a sale), then the player
+	               card (avatar, name, level badge + XP bar filled by essence via LevelBar)
+	  Left         2x2 icon grid with badges: Backpack (seeds, supplies + tools, ribbons;
+	               badge = new ribbons), Upgrades, Fairs (fair waiting for an entry),
+	               Champion (needs care)
+	  Top right    Settings icon
 	  Top center   travel buttons: My Garden (your plot) and Shops (Seed Shop, Sell, Fair)
-	  Left         nav buttons: Backpack (seeds, supplies + tools), Upgrades, Settings
-	  Right        menu buttons with badges (champion needs care, fair waiting for
-	               an entry, new ribbons)
 	Seeds and supplies are bought and veggies sold at the stands in the middle, not from the HUD.
 	  Bottom       seed hotbar (selected seed lifts up)
 	  Top center   toasts, under the travel buttons (own ScreenGui above panels and modals)
 
 	Fly-to targets for effects (harvest -> basket in G4, coins, essence):
-	    Hud.target("Coins" | "Level" | "Backpack" | "Upgrades" | "Fair" | "Champion" | "Ribbons" | "Seeds")
+	    Hud.target("Coins" | "Level" | "Backpack" | "Upgrades" | "Fair" | "Champion" | "Settings" | "Seeds")
 
 	Art slots: CoinIcon, LevelIcon, Menu<Panel>, Seed_<cropId> (see Theme.Art).
 ]]
@@ -42,28 +43,24 @@ local Teleport = require(script.Parent.Parent.Controllers.Teleport)
 
 local Hud = {}
 
-export type MenuEntry = { panel: string, text: string, icon: string, color: Color3 }
-export type NavEntry = { id: string, panel: string, tab: string?, text: string, icon: string, color: Color3 }
+export type NavEntry = { id: string, panel: string, tab: string?, icon: string, color: Color3 }
 
--- Left nav (round buttons). `tab` opens that tab of the panel.
+-- Left icon grid, filled row by row (2 per row). `tab` opens that tab of the panel.
 Hud.NAV = {
-	{ id = "Backpack", panel = "Backpack", text = "Backpack", icon = "Backpack", color = Theme.Colors.Slate },
-	{ id = "Upgrades", panel = "Upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
-	{ id = "Settings", panel = "Settings", text = "Settings", icon = "Settings", color = Theme.Colors.Gold },
+	{ id = "Backpack", panel = "Backpack", icon = "Backpack", color = Theme.Colors.Slate },
+	{ id = "Upgrades", panel = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
+	{ id = "Fair", panel = "Fair", icon = "Trophy", color = Theme.Colors.Gold },
+	{ id = "Champion", panel = "Champion", icon = "Crown", color = Theme.Colors.Danger },
 } :: { NavEntry }
+
+-- Top right icon.
+Hud.SETTINGS = { id = "Settings", panel = "Settings", icon = "Settings", color = Theme.Colors.Gold } :: NavEntry
 
 -- Top travel buttons.
 Hud.TRAVEL = {
 	{ id = "Garden", text = "My Garden", icon = "Home", color = Theme.Colors.Primary, go = Teleport.toGarden },
 	{ id = "Shops", text = "Shops", icon = "Shop", color = Theme.Colors.Danger, go = Teleport.toShops },
 }
-
--- Right menu.
-Hud.MENU = {
-	{ panel = "Fair", text = "Fairs", icon = "Trophy", color = Theme.Colors.Gold },
-	{ panel = "Champion", text = "Champion", icon = "Crown", color = Theme.Colors.Purple },
-	{ panel = "Ribbons", text = "Ribbons", icon = "Ribbon", color = Theme.Colors.Danger },
-} :: { MenuEntry }
 
 local root: Frame
 local coinPill: Frame
@@ -73,10 +70,9 @@ local gemPill: Frame
 local nav: Frame
 local travel: Frame
 local navButtons: { [string]: TextButton } = {}
-local menu: Frame
+local settingsHolder: Frame
 local seedScroller: ScrollingFrame
 local seedDock: Frame
-local menuButtons: { [string]: TextButton } = {}
 local menuBadges: { [string]: Frame } = {}
 local seedSlots: { [string]: { holder: Frame, button: TextButton, count: TextLabel, edge: UIStroke, shadow: Frame?, selected: boolean } } =
 	{}
@@ -86,6 +82,10 @@ local coinPending: number? = nil
 local toolActive = false
 local lastData: { [string]: any }? = nil
 local dockHidden = false
+
+local NAV_GAP = 8
+local STATS_WIDTH = Theme.Size.PillWidth + 20
+local STATS_HEIGHT = 172
 
 local function cropOrder(): { any }
 	local list = {}
@@ -113,8 +113,9 @@ local function buildStats()
 	local stats = UIKit.new("Frame", {
 		Name = "Stats",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(16, 14),
-		Size = UDim2.fromOffset(Theme.Size.PillWidth + 20, 172),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 16, 1, -14),
+		Size = UDim2.fromOffset(STATS_WIDTH, STATS_HEIGHT),
 		Parent = root,
 	})
 
@@ -122,7 +123,7 @@ local function buildStats()
 	coinPill = UIKit.new("Frame", {
 		Name = "Coins",
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(18, 4),
+		Position = UDim2.fromOffset(18, 52),
 		Size = UDim2.fromOffset(Theme.Size.PillWidth - 18, 44),
 		ZIndex = 2,
 		Parent = stats,
@@ -162,7 +163,7 @@ local function buildStats()
 	gemPill = UIKit.new("Frame", {
 		Name = "Gems",
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(18, 58),
+		Position = UDim2.fromOffset(18, 4),
 		Size = UDim2.fromOffset(Theme.Size.PillWidth - 60, 38),
 		ZIndex = 2,
 		Parent = stats,
@@ -288,30 +289,61 @@ local function buildStats()
 end
 
 -- Reference-style rectangle buttons: colour + icon square + bold outlined text.
-local navHolders: { Frame } = {}
 local travelHolders: { Frame } = {}
-local menuHolders: { Frame } = {}
+-- Square icon-only buttons (left grid and settings).
+local iconHolders: { Frame } = {}
 
--- Left nav (Backpack, Upgrades, Settings).
+-- The action button look with only the icon, centred.
+local function iconButton(entry: NavEntry, onMenu: (panel: string, tab: string?) -> ()): (Frame, TextButton)
+	local size = Theme.Size.IconButton
+	local holder, button = UIKit.actionButton("", entry.icon, entry.color, function()
+		onMenu(entry.panel, entry.tab)
+	end, Vector2.new(size, size))
+	holder.Name = entry.id
+	local tile = button:FindFirstChild("IconTile") :: Frame?
+	if tile then
+		tile.AnchorPoint = Vector2.new(0.5, 0.5)
+		tile.Position = UDim2.fromScale(0.5, 0.5)
+		tile.BackgroundTransparency = 1
+	end
+	navButtons[entry.id] = button
+	menuBadges[entry.panel] = UIKit.badge(button)
+	table.insert(iconHolders, holder)
+	return holder, button
+end
+
+-- Left side: Backpack, Upgrades, Fairs, Champion as a 2x2 grid of icons.
 local function buildNav(onMenu: (panel: string, tab: string?) -> ())
+	local size = Theme.Size.IconButton
 	nav = UIKit.new("Frame", {
 		Name = "Nav",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(16, 196),
-		Size = UDim2.fromOffset(Theme.Size.ActionButton.X, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 16, 0.5, -40),
+		Size = UDim2.fromOffset(size * 2 + NAV_GAP, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Parent = root,
-	}, { UIKit.list(Enum.FillDirection.Vertical, 6) })
+	}, {
+		UIKit.new("UIGridLayout", {
+			CellSize = UDim2.fromOffset(size, size + 5),
+			CellPadding = UDim2.fromOffset(NAV_GAP, NAV_GAP),
+			FillDirectionMaxCells = 2,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	})
 	for i, entry in Hud.NAV do
-		local holder, button = UIKit.actionButton(entry.text, entry.icon, entry.color, function()
-			onMenu(entry.panel, entry.tab)
-		end)
-		holder.Name = entry.id
+		local holder = iconButton(entry, onMenu)
 		holder.LayoutOrder = i
 		holder.Parent = nav
-		navButtons[entry.id] = button
-		table.insert(navHolders, holder)
 	end
+end
+
+-- Top right: the Settings icon.
+local function buildSettings(onMenu: (panel: string, tab: string?) -> ())
+	settingsHolder = iconButton(Hud.SETTINGS, onMenu)
+	settingsHolder.AnchorPoint = Vector2.new(1, 0)
+	settingsHolder.Position = UDim2.new(1, -16, 0, 14)
+	settingsHolder.Parent = root
 end
 
 -- Top center: teleport to your own garden, or to the stands in the middle.
@@ -332,30 +364,6 @@ local function buildTravel()
 		holder.Parent = travel
 		navButtons[entry.id] = button
 		table.insert(travelHolders, holder)
-	end
-end
-
--- Right menu (Fairs, Champion, Ribbons) in the same style, with badges.
-local function buildMenu(onMenu: (panel: string) -> ())
-	menu = UIKit.new("Frame", {
-		Name = "Menu",
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -16, 0.5, 0),
-		Size = UDim2.fromOffset(Theme.Size.ActionButton.X, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Parent = root,
-	}, { UIKit.list(Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Right) })
-	for i, entry in Hud.MENU do
-		local holder, button = UIKit.actionButton(entry.text, entry.icon, entry.color, function()
-			onMenu(entry.panel)
-		end)
-		holder.Name = entry.panel
-		holder.LayoutOrder = i
-		holder.Parent = menu
-		menuButtons[entry.panel] = button
-		menuBadges[entry.panel] = UIKit.badge(button)
-		table.insert(menuHolders, holder)
 	end
 end
 
@@ -391,18 +399,18 @@ local function layoutForDevice()
 	local phone = Scale.isPhone()
 	local buttonSize = if phone then Theme.Size.ActionButtonPhone else Theme.Size.ActionButton
 	local textSize = if phone then Theme.TextSize.Body - 2 else Theme.TextSize.Large - 2
-	for _, holder in navHolders do
-		UIKit.setActionSize(holder, buttonSize, textSize)
-	end
-	for _, holder in menuHolders do
-		UIKit.setActionSize(holder, buttonSize, textSize)
-	end
 	for _, holder in travelHolders do
 		UIKit.setActionSize(holder, buttonSize, textSize)
 	end
-	nav.Size = UDim2.fromOffset(buttonSize.X, 0)
-	menu.Size = UDim2.fromOffset(buttonSize.X, 0)
-	local menuSize = buttonSize.X
+	local icon = if phone then Theme.Size.IconButtonPhone else Theme.Size.IconButton
+	for _, holder in iconHolders do
+		UIKit.setActionSize(holder, Vector2.new(icon, icon))
+	end
+	nav.Size = UDim2.fromOffset(icon * 2 + NAV_GAP, 0)
+	local grid = nav:FindFirstChildOfClass("UIGridLayout")
+	if grid then
+		grid.CellSize = UDim2.fromOffset(icon, icon + 5)
+	end
 	local slotSize = if phone then Theme.Size.SeedSlotPhone else Theme.Size.SeedSlot
 	ToolBar.resize(slotSize)
 	for _, slot in seedSlots do
@@ -412,9 +420,9 @@ local function layoutForDevice()
 			slot.shadow.Size = slot.button.Size
 		end
 	end
-	-- Keep the hotbar clear of the menu and, on touch screens, the thumbstick and jump button.
+	-- Keep the hotbar clear of the stats in the corner and, on touch screens, the thumbstick and jump button.
 	local rootWidth = root.AbsoluteSize.X / math.max(Scale.value, 0.01)
-	local margin = if phone then 170 else (menuSize + 48) * 2
+	local margin = if phone then 170 else (STATS_WIDTH + 32) * 2
 	seedDock.Size = UDim2.fromOffset(math.max(240, rootWidth - margin), slotSize + 20)
 end
 
@@ -542,8 +550,8 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 
 	buildStats()
 	buildNav(onMenu)
+	buildSettings(onMenu)
 	buildTravel()
-	buildMenu(onMenu)
 	buildSeedDock()
 	-- Picking a seed puts any garden tool away.
 	local function selectSeed(cropId: string)
@@ -636,7 +644,7 @@ function Hud.target(name: string): GuiObject?
 	elseif name == "Gems" then
 		return gemPill
 	end
-	return menuButtons[name] or navButtons[name]
+	return navButtons[name]
 end
 
 -- Slides the seed hotbar away while a panel is open, so the panel has the stage.
@@ -651,7 +659,7 @@ function Hud.setDockHidden(hidden: boolean)
 end
 
 function Hud.menuButton(panel: string): TextButton?
-	return menuButtons[panel]
+	return navButtons[panel]
 end
 
 return Hud
