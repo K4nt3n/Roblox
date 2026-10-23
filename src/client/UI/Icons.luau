@@ -133,21 +133,20 @@ local IMAGES: { [string]: string } = {
 	Rock = "rbxassetid://88036331511561",
 	Crate = "rbxassetid://71398394030588",
 	Cash = "rbxassetid://135059430542618",
-	Gems = "rbxassetid://81837623258827",
+	Gems = "rbxassetid://121449516132218", -- Peter's art
 	Coins = "rbxassetid://97357776897727",
 	Leaves = "rbxassetid://108052201030190",
 	Shop = "rbxassetid://119819984937638",
 	Seeds = "rbxassetid://111591482395541",
 	Settings = "rbxassetid://106320831987822",
 	Home = "rbxassetid://92432938057083",
-	Backpack = "rbxassetid://96912306509179",
+	Backpack = "rbxassetid://95947609675186", -- Peter's art
 	Basket = "rbxassetid://119662165172518",
-	Upgrades = "rbxassetid://86740511208603",
+	Upgrades = "rbxassetid://105474617673297", -- Peter's art
 	Rewards = "rbxassetid://100782637837673",
 	Profile = "rbxassetid://77420709122744",
-	Trophy = "rbxassetid://106798587561921",
-	-- Crown: the uploaded image (rbxassetid://125161749903030) was too low resolution, so the
-	-- crisp 👑 emoji is used until a sharper image id goes here.
+	Trophy = "rbxassetid://130038282233028", -- Peter's art
+	Crown = "rbxassetid://109345674374193", -- Peter's art
 	Success = "rbxassetid://109300110129433",
 	Info = "rbxassetid://127303904167870",
 	Error = "rbxassetid://90461792057933",
@@ -156,7 +155,7 @@ local IMAGES: { [string]: string } = {
 	Energy = "rbxassetid://93148120119489",
 	Sun = "rbxassetid://93148120119489",
 	Level = "rbxassetid://119845549049763",
-	Star = "rbxassetid://131078459911114",
+	Star = "rbxassetid://72875467828151", -- Peter's art
 	Heart = "rbxassetid://101734815415752",
 	Hand = "rbxassetid://103275385118466",
 	CoinsStack = "rbxassetid://124458271247406",
@@ -184,7 +183,7 @@ end
 -- ArtSlot slot name -> icon name. Seeds, upgrades and supplies map by id below.
 Icons.Slots = {
 	CoinIcon = "Coins", -- the "Cash" image looked badly cut out on the coin pill
-	LevelIcon = "Level",
+	LevelIcon = "Star",
 	GemIcon = "Gems",
 	MenuShop = "Shop",
 	MenuMarket = "Basket",
