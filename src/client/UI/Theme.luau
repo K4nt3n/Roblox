@@ -137,6 +137,9 @@ Theme.Size = {
 	-- Square icon-only HUD buttons (left grid, settings).
 	IconButton = 64,
 	IconButtonPhone = 50,
+	-- Wide left-side HUD buttons (Backpack, Upgrades, Fairs, Champion).
+	SideButton = Vector2.new(190, 54),
+	SideButtonPhone = Vector2.new(140, 42),
 	SeedSlot = 76,
 	SeedSlotPhone = 64,
 	PillWidth = 220,
