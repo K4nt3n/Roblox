@@ -134,94 +134,6 @@ function UIKit.outline(gui: GuiObject, thickness: number?, transparency: number?
 	return stroke
 end
 
--- Text properties the hole-filling layers copy from their label.
-local TEXT_MIRROR = {
-	"Text",
-	"Font",
-	"FontFace",
-	"TextSize",
-	"TextScaled",
-	"TextWrapped",
-	"TextTruncate",
-	"TextXAlignment",
-	"TextYAlignment",
-	"RichText",
-	"LineHeight",
-	"TextTransparency",
-	"MaxVisibleGraphemes",
-}
-
--- Directions of the black copies that fill letter holes.
-local FILL_OFFSETS = {
-	Vector2.new(1, 0),
-	Vector2.new(-1, 0),
-	Vector2.new(0, 1),
-	Vector2.new(0, -1),
-	Vector2.new(0.7, 0.7),
-	Vector2.new(-0.7, 0.7),
-	Vector2.new(0.7, -0.7),
-	Vector2.new(-0.7, -0.7),
-}
-
---[[
-	The stroke leaves a light dot in the middle of the holes in e, o, a, d, p, however thick
-	it is. On top of the label (which keeps its own text, stroke, size and layout untouched)
-	sit black copies nudged a little in each direction, whose solid letters cover those holes,
-	and over them a copy in the label's colour that hides the black again everywhere except
-	the holes and the outline. The copies follow the label's text, font, size and colour.
-]]
-local function fillLetterHoles(text: GuiObject, stroke: UIStroke)
-	local label = text :: any
-	local layers = UIKit.new("Frame", {
-		Name = "TextFill",
-		BackgroundTransparency = 1,
-		Size = UDim2.fromScale(1, 1),
-		Parent = text,
-	})
-	local function copyLabel(name: string, zIndex: number): TextLabel
-		return UIKit.new("TextLabel", {
-			Name = name,
-			BackgroundTransparency = 1,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = zIndex,
-			TextColor3 = Theme.Style.Outline,
-			Parent = layers,
-		})
-	end
-	local fills = {}
-	for i in FILL_OFFSETS do
-		fills[i] = copyLabel("Fill" .. i, 1)
-	end
-	local front = copyLabel("Front", 2)
-	local all = table.clone(fills)
-	table.insert(all, front)
-	for _, property in TEXT_MIRROR do
-		local function copy()
-			for _, layer in all do
-				(layer :: any)[property] = label[property]
-			end
-		end
-		text:GetPropertyChangedSignal(property):Connect(copy)
-		copy()
-	end
-	local function place()
-		-- Inside the outline, so the copies never poke out past it.
-		local distance = stroke.Thickness * 0.8
-		for i, offset in FILL_OFFSETS do
-			fills[i].Position = UDim2.fromOffset(offset.X * distance, offset.Y * distance)
-		end
-	end
-	stroke:GetPropertyChangedSignal("Thickness"):Connect(place)
-	place()
-	local function sync()
-		front.TextColor3 = label.TextColor3
-		layers.Visible = stroke.Enabled
-	end
-	text:GetPropertyChangedSignal("TextColor3"):Connect(sync)
-	stroke:GetPropertyChangedSignal("Enabled"):Connect(sync)
-	sync()
-end
-
 -- Dark outline around text. Only shown when the text is light, so dark text stays clean,
 -- unless `always` (bright coloured text, like the fair timers).
 function UIKit.outlineText(text: GuiObject, thickness: number?, always: boolean?): UIStroke
@@ -243,7 +155,6 @@ function UIKit.outlineText(text: GuiObject, thickness: number?, always: boolean?
 	end
 	text:GetPropertyChangedSignal("TextColor3"):Connect(sync)
 	sync()
-	fillLetterHoles(text, stroke)
 	return stroke
 end
 
