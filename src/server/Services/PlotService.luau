@@ -133,7 +133,7 @@ local function buildGarden(player: Player, slot: number): Model
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Enum.Font.LuckiestGuy
 	label.TextScaled = true
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextStrokeTransparency = 0.4
@@ -232,7 +232,7 @@ local function buildStands()
 			local label = Instance.new("TextLabel")
 			label.Size = UDim2.fromScale(1, 1)
 			label.BackgroundTransparency = 1
-			label.Font = Enum.Font.FredokaOne
+			label.Font = Enum.Font.LuckiestGuy
 			label.TextScaled = true
 			label.TextColor3 = Color3.new(1, 1, 1)
 			label.TextStrokeTransparency = 0.4
