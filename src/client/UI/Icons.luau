@@ -182,7 +182,7 @@ end
 
 -- ArtSlot slot name -> icon name. Seeds, upgrades and supplies map by id below.
 Icons.Slots = {
-	CoinIcon = "Cash",
+	CoinIcon = "Coins", -- the "Cash" image looked badly cut out on the coin pill
 	LevelIcon = "Level",
 	GemIcon = "Gems",
 	MenuShop = "Shop",

@@ -6,9 +6,10 @@
 	  Bottom left  stacked: gem pill (premium currency, "Soon" for now) on top,
 	               coin pill (rolls up, coins fly into it on a sale), then the player
 	               card (avatar, name, level badge + XP bar filled by essence via LevelBar)
-	  Left         2x2 icon grid with badges: Backpack (seeds, supplies + tools, ribbons;
-	               badge = new ribbons), Upgrades, Fairs (fair waiting for an entry),
-	               Champion (needs care)
+	  Left         stack of wide buttons (big icon hanging off the left edge, bold
+	               name, red "!" badge on the corner): Backpack (seeds, supplies + tools,
+	               ribbons; badge = new ribbons), Upgrades, Fairs (fair waiting for an
+	               entry), Champion (needs care)
 	  Top right    Settings icon
 	  Top center   travel buttons: My Garden (your plot) and Shops (Seed Shop, Sell, Fair)
 	Seeds and supplies are bought and veggies sold at the stands in the middle, not from the HUD.
@@ -45,7 +46,7 @@ local Hud = {}
 
 export type NavEntry = { id: string, panel: string, tab: string?, text: string?, icon: string, color: Color3 }
 
--- Left icon grid, filled row by row (2 per row). `tab` opens that tab of the panel.
+-- Left button stack, top to bottom. `tab` opens that tab of the panel.
 Hud.NAV = {
 	{ id = "Backpack", panel = "Backpack", text = "Backpack", icon = "Backpack", color = Theme.Colors.Slate },
 	{ id = "Upgrades", panel = "Upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
@@ -83,9 +84,9 @@ local toolActive = false
 local lastData: { [string]: any }? = nil
 local dockHidden = false
 
-local NAV_GAP = 12
--- Name label under each icon in the left grid.
-local NAV_LABEL = 18
+local NAV_GAP = 10
+-- The side button icon is this much taller than the button and hangs off its left edge.
+local SIDE_ICON_SCALE = 1.3
 -- Gap between the very top of the screen (Roblox top bar included) and the top buttons.
 local TOP_GAP = 4
 local STATS_WIDTH = Theme.Size.PillWidth + 20
@@ -296,6 +297,8 @@ end
 local travelHolders: { Frame } = {}
 -- Square icon-only buttons (left grid and settings).
 local iconHolders: { Frame } = {}
+-- Wide side buttons (left stack).
+local sideHolders: { Frame } = {}
 
 -- The action button look with only the icon, centred.
 local function iconButton(entry: NavEntry, onMenu: (panel: string, tab: string?) -> ()): (Frame, TextButton)
@@ -310,50 +313,71 @@ local function iconButton(entry: NavEntry, onMenu: (panel: string, tab: string?)
 		tile.Position = UDim2.fromScale(0.5, 0.5)
 		tile.BackgroundTransparency = 1
 	end
-	if entry.text then
-		local label = UIKit.label(entry.text, Theme.TextSize.Small, {
-			Name = "Caption",
-			-- The grid cell (= holder) is button + lip + caption tall, so the caption sits at its bottom.
-			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, 0),
-			Size = UDim2.new(1, NAV_GAP, 0, NAV_LABEL),
-			AutomaticSize = Enum.AutomaticSize.None,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextScaled = true,
-			TextColor3 = Theme.Colors.TextOnPrimary,
-			ZIndex = 3,
-			Parent = holder,
-		})
-		UIKit.new("UITextSizeConstraint", { MaxTextSize = Theme.TextSize.Small, Parent = label })
-		UIKit.outlineText(label, 2)
-	end
 	navButtons[entry.id] = button
 	menuBadges[entry.panel] = UIKit.badge(button)
 	table.insert(iconHolders, holder)
 	return holder, button
 end
 
--- Left side: Backpack, Upgrades, Fairs, Champion as a 2x2 grid of icons.
+-- Red rounded-square "!" badge sitting on the top right corner (reference HUD look).
+local function cornerBadge(button: TextButton): Frame
+	local badge = UIKit.badge(button)
+	badge.AnchorPoint = Vector2.new(0.5, 0.5)
+	badge.Position = UDim2.new(1, -4, 0, 2)
+	local round = badge:FindFirstChildOfClass("UICorner")
+	if round then
+		round.CornerRadius = UDim.new(0, 6)
+	end
+	return badge
+end
+
+-- Wide side button: colour + lip + outline (UIKit.actionButton), a big icon hanging
+-- off the left edge and the name in bold outlined text.
+local function sideButton(entry: NavEntry, onMenu: (panel: string, tab: string?) -> ()): Frame
+	local size = Theme.Size.SideButton
+	local holder, button = UIKit.actionButton(entry.text or entry.id, nil, entry.color, function()
+		onMenu(entry.panel, entry.tab)
+	end, size)
+	holder.Name = entry.id
+	local icon = Icons.make(entry.icon)
+	icon.Name = "BigIcon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.new(0, 6, 0.5, -2)
+	icon.Size = UDim2.fromScale(SIDE_ICON_SCALE, SIDE_ICON_SCALE)
+	icon.ZIndex = 4
+	UIKit.new("UIAspectRatioConstraint", { AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height, Parent = icon })
+	icon.Parent = button
+	navButtons[entry.id] = button
+	menuBadges[entry.panel] = cornerBadge(button)
+	table.insert(sideHolders, holder)
+	return holder
+end
+
+-- Pads the name past the hanging icon (re-run when the button resizes).
+local function fitSideLabel(holder: Frame, size: Vector2, textSize: number)
+	UIKit.setActionSize(holder, size, textSize)
+	local button = holder:FindFirstChild("Button") :: TextButton?
+	local label = button and button:FindFirstChild("Label") :: TextLabel?
+	local padding = label and label:FindFirstChildOfClass("UIPadding")
+	if padding then
+		padding.PaddingLeft = UDim.new(0, math.floor(size.Y * SIDE_ICON_SCALE / 2) + 8)
+	end
+end
+
+-- Left side: Backpack, Upgrades, Fairs, Champion stacked as wide buttons.
 local function buildNav(onMenu: (panel: string, tab: string?) -> ())
-	local size = Theme.Size.IconButton
 	nav = UIKit.new("Frame", {
 		Name = "Nav",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 16, 0.5, -40),
-		Size = UDim2.fromOffset(size * 2 + NAV_GAP, 0),
+		-- Room on the left for the icons that hang off the buttons.
+		Position = UDim2.new(0, 16 + math.floor(Theme.Size.SideButton.Y * SIDE_ICON_SCALE / 2) - 6, 0.5, -40),
+		Size = UDim2.fromOffset(Theme.Size.SideButton.X, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Parent = root,
-	}, {
-		UIKit.new("UIGridLayout", {
-			CellSize = UDim2.fromOffset(size, size + 5 + NAV_LABEL),
-			CellPadding = UDim2.fromOffset(NAV_GAP, NAV_GAP),
-			FillDirectionMaxCells = 2,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		}),
-	})
+	}, { UIKit.list(Enum.FillDirection.Vertical, NAV_GAP) })
 	for i, entry in Hud.NAV do
-		local holder = iconButton(entry, onMenu)
+		local holder = sideButton(entry, onMenu)
 		holder.LayoutOrder = i
 		holder.Parent = nav
 	end
@@ -427,11 +451,12 @@ local function layoutForDevice()
 	for _, holder in iconHolders do
 		UIKit.setActionSize(holder, Vector2.new(icon, icon))
 	end
-	nav.Size = UDim2.fromOffset(icon * 2 + NAV_GAP, 0)
-	local grid = nav:FindFirstChildOfClass("UIGridLayout")
-	if grid then
-		grid.CellSize = UDim2.fromOffset(icon, icon + 5 + NAV_LABEL)
+	local side = if phone then Theme.Size.SideButtonPhone else Theme.Size.SideButton
+	for _, holder in sideHolders do
+		fitSideLabel(holder, side, if phone then Theme.TextSize.Body else Theme.TextSize.Large + 2)
 	end
+	nav.Size = UDim2.fromOffset(side.X, 0)
+	nav.Position = UDim2.new(0, 16 + math.floor(side.Y * SIDE_ICON_SCALE / 2) - 6, 0.5, -40)
 	local slotSize = if phone then Theme.Size.SeedSlotPhone else Theme.Size.SeedSlot
 	ToolBar.resize(slotSize)
 	for _, slot in seedSlots do
