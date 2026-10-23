@@ -623,7 +623,7 @@ local function renderSeeds(data: { [string]: any })
 		end
 		-- Free seeds never run out, so they show no count.
 		slot.count.Visible = crop.seedCost ~= 0
-		slot.count.Text = tostring(count)
+		slot.count.Text = "x" .. count
 		setSlotSelected(crop.id, data.selectedSeed == crop.id and not toolActive)
 	end
 	seedsRendered = true

@@ -244,7 +244,7 @@ function ToolBar.render(data: { [string]: any })
 		if count and def and def.supply then
 			local bags = if data.supplies then data.supplies[def.supply] or 0 else 0
 			-- Show 0 too (in red), so players see they are out.
-			count.Text = tostring(bags)
+			count.Text = "x" .. bags
 			count.TextColor3 = if bags > 0 then Theme.Colors.TextOnPrimary else Theme.Colors.Danger
 			count.Visible = true
 		end
