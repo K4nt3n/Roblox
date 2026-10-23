@@ -27,7 +27,7 @@ local ToolBar = {}
 ToolBar.Changed = Signal.new() -- (equippedToolId: string?)
 
 -- Share of the slot the tool icon fills.
-local ICON_SCALE = 0.72
+local ICON_SCALE = 0.68
 
 local ORDER = { "WateringBucket", "PestRemover", "Fertilizer" }
 local SHORT_NAME: { [string]: string } = {
@@ -42,6 +42,7 @@ type Slot = { holder: Frame, button: TextButton, edge: UIStroke, badge: Frame?, 
 local localPlayer = Players.LocalPlayer
 local slots: { [string]: Slot } = {}
 local equippedId: string? = nil
+local divider: Frame? = nil
 
 local function findTool(toolId: string): Tool?
 	for _, container in { localPlayer.Character, localPlayer:FindFirstChildOfClass("Backpack") } do
@@ -76,7 +77,7 @@ local function paintSlot(slot: Slot, equipped: boolean)
 	end
 	slot.equipped = equipped
 	Tweens.play(slot.button, Tweens.Ease.PanelIn, {
-		Position = UDim2.new(0.5, 0, 1, if equipped then -16 else -6),
+		Position = UDim2.new(0.5, 0, 1, if equipped then -4 - Theme.Size.SlotLift else -4),
 	})
 	Tweens.play(slot.edge, Tweens.Ease.Hover, {
 		Color = if equipped then Theme.Colors.Gold else Theme.Style.Outline,
@@ -141,7 +142,7 @@ local function makeSlot(parent: Instance, toolId: string, index: number)
 		Name = "Tool_" .. toolId,
 		BackgroundTransparency = 1,
 		LayoutOrder = -100 + index,
-		Size = UDim2.fromOffset(size, size + 12),
+		Size = UDim2.fromOffset(size, size + Theme.Size.SlotHeadroom + 4),
 		Parent = parent,
 	})
 	local button = UIKit.button("", function()
@@ -149,7 +150,7 @@ local function makeSlot(parent: Instance, toolId: string, index: number)
 	end, {
 		Name = "Slot",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -6),
+		Position = UDim2.new(0.5, 0, 1, -4),
 		Size = UDim2.fromOffset(size, size),
 		BackgroundColor3 = Theme.Colors.Surface,
 		Parent = holder,
@@ -175,7 +176,7 @@ local function makeSlot(parent: Instance, toolId: string, index: number)
 	local name = UIKit.label(SHORT_NAME[toolId] or toolId, 12, {
 		Name = "Name",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -5),
+		Position = UDim2.new(0.5, 0, 1, -4),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextColor3 = Theme.Colors.TextOnPrimary,
 		ZIndex = 4, -- over the icon
@@ -211,10 +212,10 @@ function ToolBar.mount(hotbar: Instance)
 	for i, toolId in ORDER do
 		makeSlot(hotbar, toolId, i)
 	end
-	UIKit.new("Frame", {
+	divider = UIKit.new("Frame", {
 		Name = "ToolDivider",
 		LayoutOrder = -50,
-		Size = UDim2.fromOffset(4, 56),
+		Size = UDim2.fromOffset(4, Theme.Size.SeedSlot - 14),
 		BackgroundColor3 = Theme.Colors.TextOnPrimary,
 		BackgroundTransparency = 0.5,
 		BorderSizePixel = 0,
@@ -265,8 +266,11 @@ end
 
 function ToolBar.resize(size: number)
 	for _, slot in slots do
-		slot.holder.Size = UDim2.fromOffset(size, size + 12)
+		slot.holder.Size = UDim2.fromOffset(size, size + Theme.Size.SlotHeadroom + 4)
 		slot.button.Size = UDim2.fromOffset(size, size)
+	end
+	if divider then
+		divider.Size = UDim2.fromOffset(4, size - 14)
 	end
 end
 
