@@ -137,7 +137,9 @@ Theme.Layer = {
 --[[
 	Art slots. Put an asset id ("rbxassetid://123") next to a slot name and
 	every place that slot is drawn shows the image instead of the placeholder.
-	Seed icons use "Seed_<cropId>", ribbons "Ribbon_<Blue|Red|Yellow|Team|Entrant>".
+	Seed icons use "Seed_<cropId>", upgrades "Upgrade_<upgradeId>", ribbons
+	"Ribbon_<Blue|Red|Yellow|Team|Entrant>", fair places "Medal_<1|2|3>".
+	PanelIcon_<Panel> left empty reuses Menu<Panel>, so one upload covers both.
 	Slots not listed here still work: ArtSlot falls back to the placeholder.
 ]]
 Theme.Art = {
@@ -149,13 +151,25 @@ Theme.Art = {
 	MenuFair = "",
 	MenuChampion = "",
 	MenuRibbons = "",
-	-- Panel headers (icon left of the title).
+	-- Panel headers (icon left of the title). Empty uses the Menu<Panel> art.
 	PanelIcon_Shop = "",
 	PanelIcon_Market = "",
 	PanelIcon_Fair = "",
 	PanelIcon_Champion = "",
 	PanelIcon_Ribbons = "",
 	ChampionPortrait = "",
+	-- Seeds (hotbar, shop, basket).
+	Seed_carrot = "",
+	Seed_tomato = "",
+	Seed_cabbage = "",
+	Seed_pumpkin = "",
+	Seed_watermelon = "",
+	-- Shop upgrades.
+	Upgrade_wateringCan = "",
+	Upgrade_fertilizer = "",
+	Upgrade_greenThumb = "",
+	Upgrade_marketStall = "",
+	Upgrade_plot = "",
 	-- 9-slice frames. Set ArtSlice for the matching slot too.
 	PanelFrame = "",
 	ButtonFace = "",
