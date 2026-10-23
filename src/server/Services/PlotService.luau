@@ -22,6 +22,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Signal = require(Shared.Signal)
 local CareMath = require(Shared.CareMath)
+local Studs = require(script.Parent.Parent.Map.Studs)
 
 local PlotService = {}
 
@@ -114,6 +115,7 @@ local function buildGarden(player: Player, slot: number): Model
 	base.Color = rgb(w.colors.garden)
 	base.Material = Enum.Material.SmoothPlastic
 	base.TopSurface = Enum.SurfaceType.Smooth
+	Studs.apply(base)
 	base.Parent = model
 	model.PrimaryPart = base
 
@@ -158,6 +160,7 @@ local function buildGarden(player: Player, slot: number): Model
 		plot.CFrame = origin * CFrame.new(x, 1.3, z)
 		plot.Material = Enum.Material.SmoothPlastic
 		plot.Color = rgb(w.colors.soil)
+		Studs.apply(plot)
 		plot:SetAttribute("PlotId", tostring(i))
 		plot:SetAttribute("OwnerUserId", player.UserId)
 		plot.Parent = plots
@@ -175,6 +178,7 @@ local function buildGarden(player: Player, slot: number): Model
 	champion.CFrame = origin * CFrame.new(0, 1.4, depth / 2 + 4 + championSize / 2 + 2)
 	champion.Material = Enum.Material.SmoothPlastic
 	champion.Color = rgb(w.colors.soil)
+	Studs.apply(champion)
 	champion:SetAttribute("PlotId", Config.Champion.plotId)
 	champion:SetAttribute("OwnerUserId", player.UserId)
 	champion:SetAttribute("IsChampionPlot", true)
@@ -187,6 +191,7 @@ local function buildGarden(player: Player, slot: number): Model
 	pad.CFrame = origin * CFrame.new(0, 0.5, depth / 2 + 4 + championSize / 2 + 2)
 	pad.Color = rgb(w.colors.stand)
 	pad.Material = Enum.Material.SmoothPlastic
+	Studs.apply(pad)
 	pad.Parent = model
 
 	makePrompt(champion, "Main", Enum.KeyCode.E, "Plant Champion")
@@ -286,6 +291,7 @@ local function buildStands()
 			part.Position = Vector3.new(def.position[1], def.position[2] + 3, def.position[3])
 			part.Color = rgb(Config.World.colors.stand)
 			part.Material = Enum.Material.SmoothPlastic
+			Studs.apply(part)
 			part.Parent = folder
 
 			local billboard = Instance.new("BillboardGui")
@@ -327,6 +333,7 @@ local function buildFairStage()
 	floor.CFrame = origin * CFrame.new(0, 1, 0)
 	floor.Color = rgb(Config.World.colors.stand)
 	floor.Material = Enum.Material.SmoothPlastic
+	Studs.apply(floor)
 	floor.Parent = stage
 
 	local scale = Instance.new("Part")

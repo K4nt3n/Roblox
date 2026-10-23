@@ -466,6 +466,48 @@ Config.World = {
 	},
 }
 
+-- The studded world map (server/Map). Built at runtime around Config.World's gardens,
+-- stands and the fair stage, unless the place already has a Workspace.Map.
+-- Positions are derived from the layout above, so moving a stand moves its plaza too.
+Config.Map = {
+	enabled = true,
+	-- Classic Roblox studs on top faces (Plastic + Studs surface). Also styles the
+	-- gardens, stands and stage PlotService builds.
+	studs = true,
+	-- Optional: an uploaded stud tile image (e.g. "rbxassetid://123"). When set, top faces
+	-- get this Texture instead of the built-in Studs surface.
+	studTexture = "",
+	studTextureTile = 2, -- studs per tile of studTexture
+	-- The default Baseplate sits exactly at y = 0, under the map's ground. Hide it at runtime.
+	hideBaseplate = true,
+	laneWidth = 10,
+	-- Bright, saturated, toy-like palette.
+	colors = {
+		grass = { 92, 200, 82 },
+		hedge = { 40, 140, 60 },
+		path = { 245, 214, 150 },
+		plaza = { 232, 236, 242 },
+		fairPlaza = { 255, 236, 186 },
+		trunk = { 140, 92, 58 },
+		leaves = { 60, 175, 70 },
+		leavesLight = { 120, 215, 90 },
+		fence = { 255, 255, 255 },
+		lampPost = { 60, 64, 80 },
+		lampLight = { 255, 226, 140 },
+		water = { 70, 170, 255 },
+		lily = { 70, 200, 90 },
+		soil = { 120, 85, 60 },
+		archPillar = { 255, 255, 255 },
+		archBeam = { 255, 90, 90 },
+		spawn = { 255, 200, 60 },
+		stripeA = { 255, 80, 80 },
+		stripeB = { 255, 255, 255 },
+		tentB = { 80, 150, 255 },
+		flags = { { 255, 80, 80 }, { 255, 200, 60 }, { 80, 150, 255 }, { 90, 210, 110 }, { 200, 110, 255 } },
+		flowers = { { 255, 90, 140 }, { 255, 220, 70 }, { 160, 120, 255 }, { 255, 140, 60 } },
+	},
+}
+
 Config.Net = {
 	-- Max requests per action per player inside the window.
 	rateLimit = { window = 2, maxCalls = 8 },

@@ -148,6 +148,21 @@ All UI is built in code, in design pixels at a 1280x720 reference.
   position. `UIController.registerPanel(name, spec)` adds new panels (settings, store, streak) with the
   same feel.
 
+## Studded map
+
+With no `Workspace.Map` in the place, `MapService` builds a classic studded world at runtime: grass, sand
+lanes around the 8 garden slots, a market plaza with the stands and the spawn, a fenced fair plaza with
+the stage, tents and bunting, a pond, lamps, flower beds, block trees and a hedge border. Every position is
+derived from `Config.World` and `Config.FairDay.stagePosition`, so moving a stand moves its plaza too.
+`tests/MapLayout.spec.luau` checks nothing blocks the gardens, stands, stage or spawn.
+
+- Look and colours: `Config.Map` (`studs`, `colors`, `laneWidth`). Set `studTexture` to an uploaded stud tile
+  to use it instead of the built-in Studs surface. Gardens, stands and stage get the same studs.
+- To see and edit the map in Studio, bake it once from the command bar in edit mode, then save:
+  `require(game.ServerScriptService.Server.Map.MapBuilder).build()`
+- At runtime the default `Baseplate` and any other `SpawnLocation` are hidden under it (not deleted).
+- A `Workspace.GardenSlots` folder means a custom garden layout, so the map is skipped.
+
 ## Art seams
 
 | What | Where to drop it | Fallback today |
@@ -157,7 +172,7 @@ All UI is built in code, in design pixels at a 1280x720 reference.
 | Sounds / animations | Asset ids in `FeelHooks.Sounds` / `FeelHooks.Animations` | Silent |
 | Garden positions | `Workspace.GardenSlots.<1..8>` parts | Generated grid |
 | Shop / market / fair stands | `Workspace.Stands.<SeedShop/Market/FairStand>` parts | Placeholder blocks |
-| Map | Any `Workspace.Map` or `Workspace.Baseplate` | Generated ground |
+| Map | Any hand-made `Workspace.Map` (without the `StuddedMap` attribute) is used as is | Studded map built at runtime from `shared/MapLayout` (see below) |
 | Fair stage | `Workspace.FairStage` with parts `Floor`, `Scale` and `CameraPoint` (the camera looks along it) | Generated stage |
 | Essence orbs | Set `EssenceFX.template` to a GuiObject (e.g. a sparkle ImageLabel) | Glowing round frames |
 | UI icons | Asset ids in `Theme.Art`: `CoinIcon`, `LevelIcon`, `Menu<Shop/Market/Fair/Champion/Ribbons>`, `PanelIcon_<panel>`, `ChampionPortrait`, plus `Seed_<cropId>`, `Upgrade_<id>`, `Ribbon_<color>`, `Medal_<1-3>` | Flat colored shapes with a letter |

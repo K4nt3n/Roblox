@@ -13,6 +13,7 @@ require("./FairMath.spec")
 require("./CareMath.spec")
 require("./Format.spec")
 require("./Schema.spec")
+require("./MapLayout.spec")
 
 if not TestKit.report() then
 	error("tests failed")
