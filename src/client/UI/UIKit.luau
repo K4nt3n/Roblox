@@ -729,6 +729,34 @@ function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 	return badge
 end
 
+-- Hotbar slot corners: the keybind top left, the quantity bottom right (a bit smaller).
+function UIKit.slotKey(slot: GuiObject, text: string): TextLabel
+	local key = UIKit.label(text, Theme.TextSize.Small + 2, {
+		Name = "Key",
+		Position = UDim2.fromOffset(5, 2),
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		ZIndex = 5,
+		Parent = slot,
+	})
+	UIKit.outlineText(key, 2, true)
+	return key
+end
+
+function UIKit.slotCount(slot: GuiObject): TextLabel
+	local count = UIKit.label("", Theme.TextSize.Small - 2, {
+		Name = "Count",
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -5, 1, -3),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		ZIndex = 5,
+		Visible = false,
+		Parent = slot,
+	})
+	UIKit.outlineText(count, 2, true)
+	return count
+end
+
 -- value: a number (0 hides), true for a "!" dot, false/nil hides. Pops on change.
 function UIKit.setBadge(badge: Frame, value: number | boolean | nil)
 	local text = if value == true
