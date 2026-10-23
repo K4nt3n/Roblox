@@ -26,6 +26,9 @@ local ToolBar = {}
 
 ToolBar.Changed = Signal.new() -- (equippedToolId: string?)
 
+-- Share of the slot the tool icon fills.
+local ICON_SCALE = 0.72
+
 local ORDER = { "WateringBucket", "PestRemover", "Fertilizer" }
 local SHORT_NAME: { [string]: string } = {
 	WateringBucket = "Bucket",
@@ -151,15 +154,16 @@ local function makeSlot(parent: Instance, toolId: string, index: number)
 		BackgroundColor3 = Theme.Colors.Surface,
 		Parent = holder,
 	})
-	ArtSlot.icon("Tool_" .. toolId, {
-		size = 40,
+	local icon = ArtSlot.icon("Tool_" .. toolId, {
 		color = Theme.Colors.Info,
 		glyph = string.sub(def and def.displayName or toolId, 1, 1),
-		anchor = Vector2.new(0.5, 0),
-		position = UDim2.new(0.5, 0, 0, 8),
+		anchor = Vector2.new(0.5, 0.5),
+		position = UDim2.fromScale(0.5, 0.5),
 		zIndex = 3,
-	}).Parent =
-		button
+	})
+	-- Big and centred, and it grows and shrinks with the slot (phone sizes).
+	icon.Size = UDim2.fromScale(ICON_SCALE, ICON_SCALE)
+	icon.Parent = button
 	local key = UIKit.label(tostring(index), 13, {
 		Name = "Key",
 		Position = UDim2.fromOffset(6, 3),
@@ -174,7 +178,7 @@ local function makeSlot(parent: Instance, toolId: string, index: number)
 		Position = UDim2.new(0.5, 0, 1, -5),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextColor3 = Theme.Colors.TextOnPrimary,
-		ZIndex = 3,
+		ZIndex = 4, -- over the icon
 		Parent = button,
 	})
 	UIKit.outlineText(name, 2)
