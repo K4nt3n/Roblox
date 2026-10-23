@@ -290,7 +290,7 @@ function Toasts.mount(parent: GuiObject)
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
 		-- Below the HUD's travel buttons (My Garden / Shops).
-		Position = UDim2.new(0.5, 0, 0, Theme.Size.ActionButton.Y + 28),
+		Position = UDim2.new(0.5, 0, 0, Theme.Size.ActionButton.Y + 16),
 		Size = UDim2.fromOffset(Theme.Size.ToastWidth, 200),
 		Parent = parent,
 	}, { UIKit.list(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Center) })

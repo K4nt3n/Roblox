@@ -43,14 +43,14 @@ local Teleport = require(script.Parent.Parent.Controllers.Teleport)
 
 local Hud = {}
 
-export type NavEntry = { id: string, panel: string, tab: string?, icon: string, color: Color3 }
+export type NavEntry = { id: string, panel: string, tab: string?, text: string?, icon: string, color: Color3 }
 
 -- Left icon grid, filled row by row (2 per row). `tab` opens that tab of the panel.
 Hud.NAV = {
-	{ id = "Backpack", panel = "Backpack", icon = "Backpack", color = Theme.Colors.Slate },
-	{ id = "Upgrades", panel = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
-	{ id = "Fair", panel = "Fair", icon = "Trophy", color = Theme.Colors.Gold },
-	{ id = "Champion", panel = "Champion", icon = "Crown", color = Theme.Colors.Danger },
+	{ id = "Backpack", panel = "Backpack", text = "Backpack", icon = "Backpack", color = Theme.Colors.Slate },
+	{ id = "Upgrades", panel = "Upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
+	{ id = "Fair", panel = "Fair", text = "Fairs", icon = "Trophy", color = Theme.Colors.Gold },
+	{ id = "Champion", panel = "Champion", text = "Champion", icon = "Crown", color = Theme.Colors.Danger },
 } :: { NavEntry }
 
 -- Top right icon.
@@ -83,7 +83,11 @@ local toolActive = false
 local lastData: { [string]: any }? = nil
 local dockHidden = false
 
-local NAV_GAP = 8
+local NAV_GAP = 12
+-- Name label under each icon in the left grid.
+local NAV_LABEL = 18
+-- Gap between the very top of the screen (Roblox top bar included) and the top buttons.
+local TOP_GAP = 4
 local STATS_WIDTH = Theme.Size.PillWidth + 20
 local STATS_HEIGHT = 172
 
@@ -306,6 +310,22 @@ local function iconButton(entry: NavEntry, onMenu: (panel: string, tab: string?)
 		tile.Position = UDim2.fromScale(0.5, 0.5)
 		tile.BackgroundTransparency = 1
 	end
+	if entry.text then
+		local label = UIKit.label(entry.text, Theme.TextSize.Small, {
+			Name = "Caption",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 1, 1),
+			Size = UDim2.new(1, NAV_GAP, 0, NAV_LABEL),
+			AutomaticSize = Enum.AutomaticSize.None,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextScaled = true,
+			TextColor3 = Theme.Colors.TextOnPrimary,
+			ZIndex = 3,
+			Parent = holder,
+		})
+		UIKit.new("UITextSizeConstraint", { MaxTextSize = Theme.TextSize.Small, Parent = label })
+		UIKit.outlineText(label, 2)
+	end
 	navButtons[entry.id] = button
 	menuBadges[entry.panel] = UIKit.badge(button)
 	table.insert(iconHolders, holder)
@@ -325,7 +345,7 @@ local function buildNav(onMenu: (panel: string, tab: string?) -> ())
 		Parent = root,
 	}, {
 		UIKit.new("UIGridLayout", {
-			CellSize = UDim2.fromOffset(size, size + 5),
+			CellSize = UDim2.fromOffset(size, size + 5 + NAV_LABEL),
 			CellPadding = UDim2.fromOffset(NAV_GAP, NAV_GAP),
 			FillDirectionMaxCells = 2,
 			SortOrder = Enum.SortOrder.LayoutOrder,
@@ -342,7 +362,7 @@ end
 local function buildSettings(onMenu: (panel: string, tab: string?) -> ())
 	settingsHolder = iconButton(Hud.SETTINGS, onMenu)
 	settingsHolder.AnchorPoint = Vector2.new(1, 0)
-	settingsHolder.Position = UDim2.new(1, -16, 0, 14)
+	settingsHolder.Position = UDim2.new(1, -16, 0, TOP_GAP)
 	settingsHolder.Parent = root
 end
 
@@ -352,7 +372,7 @@ local function buildTravel()
 		Name = "Travel",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 14),
+		Position = UDim2.new(0.5, 0, 0, TOP_GAP),
 		Size = UDim2.fromOffset(0, 0),
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Parent = root,
@@ -409,7 +429,7 @@ local function layoutForDevice()
 	nav.Size = UDim2.fromOffset(icon * 2 + NAV_GAP, 0)
 	local grid = nav:FindFirstChildOfClass("UIGridLayout")
 	if grid then
-		grid.CellSize = UDim2.fromOffset(icon, icon + 5)
+		grid.CellSize = UDim2.fromOffset(icon, icon + 5 + NAV_LABEL)
 	end
 	local slotSize = if phone then Theme.Size.SeedSlotPhone else Theme.Size.SeedSlot
 	ToolBar.resize(slotSize)
@@ -533,6 +553,8 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 	local gui = UIKit.new("ScreenGui", {
 		Name = "GVF_UI",
 		ResetOnSpawn = false,
+		-- Lets the top buttons sit right under the screen edge instead of below the Roblox top bar.
+		IgnoreGuiInset = true,
 		DisplayOrder = Theme.Layer.Hud,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = playerGui,
@@ -542,6 +564,7 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 	local toastGui = UIKit.new("ScreenGui", {
 		Name = "GVF_Toasts",
 		ResetOnSpawn = false,
+		IgnoreGuiInset = true, -- same top edge as the HUD, so toasts line up under the top buttons
 		DisplayOrder = Theme.Layer.Toasts,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = playerGui,
