@@ -134,11 +134,16 @@ function UIKit.outline(gui: GuiObject, thickness: number?, transparency: number?
 	return stroke
 end
 
--- Dark outline around text. Only shown when the text is light, so dark text stays clean.
-function UIKit.outlineText(text: GuiObject, thickness: number?): UIStroke
+-- The stroke also grows into the holes of letters (e, o, a, d, p). Below this share of the
+-- text height a thin stroke leaves a light dot inside them, so big text gets a thicker one.
+local HOLE_FILL = 0.12
+
+-- Dark outline around text. Only shown when the text is light, so dark text stays clean,
+-- unless `always` (bright coloured text, like the fair timers).
+function UIKit.outlineText(text: GuiObject, thickness: number?, always: boolean?): UIStroke
 	local existing = text:FindFirstChild("TextOutline") :: UIStroke?
 	if existing then
-		existing.Thickness = thickness or Theme.Style.TextOutline
+		existing:SetAttribute("Base", thickness or Theme.Style.TextOutline)
 		return existing
 	end
 	local stroke: UIStroke = UIKit.new("UIStroke", {
@@ -149,10 +154,20 @@ function UIKit.outlineText(text: GuiObject, thickness: number?): UIStroke
 		Thickness = thickness or Theme.Style.TextOutline,
 		Parent = text,
 	})
+	stroke:SetAttribute("Base", thickness or Theme.Style.TextOutline)
 	local function sync()
-		stroke.Enabled = Theme.wantsOutline((text :: any).TextColor3)
+		local label = text :: any
+		local base = stroke:GetAttribute("Base") :: number
+		local height = if label.TextScaled
+			then label.TextBounds.Y / math.max(1, #string.split(label.Text, "\n"))
+			else label.TextSize
+		stroke.Thickness = math.max(base, height * HOLE_FILL)
+		stroke.Enabled = always == true or Theme.wantsOutline(label.TextColor3)
 	end
-	text:GetPropertyChangedSignal("TextColor3"):Connect(sync)
+	for _, property in { "TextColor3", "TextSize", "TextBounds" } do
+		text:GetPropertyChangedSignal(property):Connect(sync)
+	end
+	stroke:GetAttributeChangedSignal("Base"):Connect(sync)
 	sync()
 	return stroke
 end
@@ -1111,6 +1126,56 @@ function UIKit.section(text: string, order: number, parent: Instance): TextLabel
 	local label = UIKit.label(text, Theme.TextSize.Large, { LayoutOrder = order, Name = "Section" })
 	label.Parent = parent
 	return label
+end
+
+-- A "how it works" card: a heading and numbered steps, each in a coloured circle.
+function UIKit.steps(title: string, steps: { string }, order: number, parent: Instance, color: Color3?): Frame
+	local accent = color or Theme.Colors.Gold
+	local card = UIKit.card({
+		Name = "Guide",
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = order,
+		BackgroundColor3 = Theme.Colors.SurfaceAlt,
+		Parent = parent,
+	}, {
+		UIKit.padding(12),
+		UIKit.list(Enum.FillDirection.Vertical, 8),
+	})
+	UIKit.label(title, Theme.TextSize.Large, { LayoutOrder = 0, TextColor3 = accent }).Parent = card
+	for i, text in steps do
+		local row = UIKit.new("Frame", {
+			Name = "Step" .. i,
+			BackgroundTransparency = 1,
+			LayoutOrder = i,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Parent = card,
+		})
+		local circle = UIKit.new("Frame", {
+			Name = "Number",
+			BackgroundColor3 = accent,
+			Size = UDim2.fromOffset(30, 30),
+			Parent = row,
+		}, { UIKit.corner(Theme.CornerRound) })
+		UIKit.outline(circle, 2)
+		local number = UIKit.label(tostring(i), Theme.TextSize.Body, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			TextColor3 = Theme.Colors.TextOnPrimary,
+			Parent = circle,
+		})
+		UIKit.outlineText(number, 2, true)
+		UIKit.label(text, Theme.TextSize.Body, {
+			Font = Theme.FontBody,
+			TextWrapped = true,
+			Position = UDim2.fromOffset(42, 4),
+			Size = UDim2.new(1, -42, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Parent = row,
+		})
+	end
+	return card
 end
 
 -- True on the frame the last input came from a gamepad (for showing selection).

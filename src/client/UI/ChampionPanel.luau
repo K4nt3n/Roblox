@@ -42,7 +42,8 @@ local function paragraph(text: string, order: number, parent: Instance, size: nu
 		TextWrapped = true,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-	}).Parent = parent
+	}).Parent =
+		parent
 end
 
 function ChampionPanel.openNamer(current: string?)
@@ -64,36 +65,72 @@ function ChampionPanel.openNamer(current: string?)
 			UIKit.button("Save name", function()
 				local text = box.Text
 				if #text > 0 then
-					task.spawn(NetClient.request, Net.Actions.NameChampion, { name = string.sub(text, 1, CHAMPION.maxNameLength * 4) })
+					task.spawn(
+						NetClient.request,
+						Net.Actions.NameChampion,
+						{ name = string.sub(text, 1, CHAMPION.maxNameLength * 4) }
+					)
 				end
 				close()
-			end, { Size = UDim2.fromOffset(160, 40) }).Parent = holder
+			end, { Size = UDim2.fromOffset(160, 40) }).Parent =
+				holder
 		end,
 		buttons = { { text = "Cancel", color = Theme.Colors.Surface, textColor = Theme.Colors.Text } },
 	})
 end
 
+local GUIDE = {
+	"Your champion is the veggie on the big plot in front of your garden. It keeps growing all week.",
+	"Now and then it needs you: water it (R or F), pick off bugs (F) or prop it up (F).",
+	"Every time you care for it, it gets heavier. Care beats luck!",
+	"Harvest it when it's big, then bring it to the Fair Judge at the Weigh-In Fair stand.",
+}
+
+-- A two-column line inside a card: name on the left, value on the right.
+local function stat(name: string, value: string, order: number, parent: Instance, color: Color3?)
+	local line = UIKit.new("Frame", {
+		BackgroundTransparency = 1,
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, 28),
+		Parent = parent,
+	})
+	UIKit.label(name, Theme.TextSize.Body, {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		Parent = line,
+	})
+	UIKit.label(value, Theme.TextSize.Body, {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, 0, 0.5, 0),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = color or Theme.Colors.Gold,
+		Parent = line,
+	})
+end
+
 function ChampionPanel.render(body: ScrollingFrame, data: { [string]: any })
 	local plant = data.plots and data.plots[CHAMPION.plotId]
-	local card = UIKit.card({ Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Parent = body }, {
-		UIKit.padding(14),
-		UIKit.list(Enum.FillDirection.Vertical, 6),
-	})
+	local card = UIKit.card(
+		{ Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, Parent = body },
+		{
+			UIKit.padding(14),
+			UIKit.list(Enum.FillDirection.Vertical, 6),
+		}
+	)
 
 	if not plant then
 		UIKit.label("No champion yet", Theme.TextSize.Large, { LayoutOrder = 1 }).Parent = card
-		paragraph(
-			"Plant any seed on the big plot in front of your garden. Your champion grows all week, and every time you care for it (water, pick off bugs, prop it up) it gets heavier. Care beats luck!",
-			2,
-			card
-		)
+		paragraph("Plant any seed on the big plot in front of your garden to start one.", 2, card)
+		UIKit.steps("How your champion works", GUIDE, 2, body, Theme.Colors.Purple)
 		return
 	end
 
 	local crop = Config.Crops[plant.cropId]
 	local now = ClientState.now()
 	local state = if crop then GrowthMath.evaluate(plant, crop, Config, now) else nil
-	local title = if plant.name then string.format("%s the %s", plant.name, crop and crop.displayName or "") else (crop and crop.displayName or "Champion")
+	local title = if plant.name
+		then string.format("%s the %s", plant.name, crop and crop.displayName or "")
+		else (crop and crop.displayName or "Champion")
 	local c = crop and crop.placeholderColor
 	ArtSlot.icon("Seed_" .. plant.cropId, {
 		size = 96,
@@ -101,12 +138,14 @@ function ChampionPanel.render(body: ScrollingFrame, data: { [string]: any })
 		color = if c then Color3.fromRGB(c[1], c[2], c[3]) else Theme.Colors.Purple,
 		glyph = if crop then string.sub(crop.displayName, 1, 1) else "?",
 		layoutOrder = -2,
-	}).Parent = card
+	}).Parent =
+		card
 	UIKit.label(title, Theme.TextSize.Large, { LayoutOrder = -1 }).Parent = card
 	if state and crop then
 		-- The weight keeps rolling up while the panel is open: you can watch it grow.
-		local weightLabel = UIKit.label("", Theme.TextSize.Huge, { LayoutOrder = 1, TextColor3 = Theme.Colors.PrimaryDark })
+		local weightLabel = UIKit.label("", Theme.TextSize.Huge, { LayoutOrder = 1, TextColor3 = Theme.Colors.Primary })
 		weightLabel.Parent = card
+		UIKit.outlineText(weightLabel, Theme.Style.TitleOutline, true)
 		local stageLabel = UIKit.label(state.stage, Theme.TextSize.Small, {
 			LayoutOrder = 2,
 			Font = Theme.FontBody,
@@ -128,37 +167,64 @@ function ChampionPanel.render(body: ScrollingFrame, data: { [string]: any })
 		end)
 	end
 
-	local careScore = plant.careScore or 0
-	local bonus = math.floor((CareMath.weightMultiplier(careScore, CHAMPION) - 1) * 100 + 0.5)
-	paragraph(string.format("Care: %.1f points (+%d%% weight)", careScore, bonus), 3, card)
-
+	-- What it needs right now.
 	local need = if crop
 		then CareMath.pendingNeed(plant, CHAMPION, now, function(t)
 			return GrowthMath.evaluate(plant, crop, Config, t).canHarvest
 		end)
 		else nil
-	if need then
-		paragraph((CARE_TEXT[need.kind] or need.kind) .. (if need.onTime then "" else " (still counts!)"), 4, card, Theme.TextSize.Large)
-	else
-		paragraph("All cared for. Check back later!", 4, card)
-	end
-
-	local paidSkips = plant.paidSkips or 0
-	paragraph(
-		if paidSkips == 0
-			then "Natural Grown: eligible (no paid skips)"
-			else string.format("Natural Grown: not eligible (%d paid skip%s)", paidSkips, if paidSkips == 1 then "" else "s"),
-		5,
-		card
+	local needCard = UIKit.card({
+		Name = "Needs",
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = 3,
+		BackgroundColor3 = Theme.Colors.SurfaceAlt,
+		Parent = card,
+	}, { UIKit.padding(10) })
+	local needEdge = needCard:FindFirstChild("Edge") :: UIStroke
+	needEdge.Color = if need then Theme.Colors.Accent else Theme.Colors.Primary
+	needEdge.Transparency = 0
+	needEdge.Thickness = 3
+	UIKit.label(
+		if need
+			then (CARE_TEXT[need.kind] or need.kind) .. (if need.onTime then "" else " (still counts!)")
+			else "All cared for. Check back later!",
+		Theme.TextSize.Large,
+		{
+			TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			TextColor3 = if need then Theme.Colors.Accent else Theme.Colors.Primary,
+			Parent = needCard,
+		}
 	)
 
-	local nameButton: (string, () -> (), { [string]: any }?) -> TextButton = if plant.name then UIKit.button else UIKit.keyButton
+	local careScore = plant.careScore or 0
+	local bonus = math.floor((CareMath.weightMultiplier(careScore, CHAMPION) - 1) * 100 + 0.5)
+	stat("Care bonus", string.format("+%d%% weight", bonus), 4, card)
+	local paidSkips = plant.paidSkips or 0
+	stat(
+		"Natural Grown ribbon",
+		if paidSkips == 0
+			then "Can win"
+			else string.format("Lost (%d paid skip%s)", paidSkips, if paidSkips == 1 then "" else "s"),
+		5,
+		card,
+		if paidSkips == 0 then Theme.Colors.Primary else Theme.Colors.TextMuted
+	)
+
+	local nameButton: (string, () -> (), { [string]: any }?) -> TextButton = if plant.name
+		then UIKit.button
+		else UIKit.keyButton
 	nameButton(if plant.name then "Rename" else "Name it", function()
 		ChampionPanel.openNamer(plant.name)
-	end, { LayoutOrder = 6, Size = UDim2.fromOffset(160, 40), BackgroundColor3 = Theme.Colors.Accent }).Parent = card
+	end, { LayoutOrder = 6, Size = UDim2.fromOffset(160, 40), BackgroundColor3 = Theme.Colors.Accent }).Parent =
+		card
+
+	UIKit.steps("How your champion works", GUIDE, 2, body, Theme.Colors.Purple)
 
 	-- Grow together.
-	UIKit.label("Grow together", Theme.TextSize.Large, { LayoutOrder = 2 }).Parent = body
+	UIKit.label("Grow together", Theme.TextSize.Large, { LayoutOrder = 3 }).Parent = body
 	local coGrowers = plant.coGrowers or {}
 	local names = {}
 	for _, userId in coGrowers do
@@ -168,8 +234,11 @@ function ChampionPanel.render(body: ScrollingFrame, data: { [string]: any })
 	paragraph(
 		if #names > 0
 			then "Growing with " .. table.concat(names, " and ") .. ". They can water and care for it, and share its prizes."
-			else string.format("Invite up to %d friends to co-grow your champion. Everyone is listed on its fair card and shares its prizes.", CHAMPION.maxCoGrowers),
-		3,
+			else string.format(
+				"Invite up to %d friends to co-grow your champion. Everyone is listed on its fair card and shares its prizes.",
+				CHAMPION.maxCoGrowers
+			),
+		4,
 		body
 	)
 	if #coGrowers < CHAMPION.maxCoGrowers then
@@ -194,12 +263,18 @@ function ChampionPanel.showInvite(ctx: { [string]: any })
 	local what = if ctx.championName then ctx.championName else ("their " .. (crop and crop.displayName or "champion"))
 	Modal.show({
 		title = ctx.ownerName .. " wants to grow together!",
-		lines = { string.format("Help raise %s. You can water and care for it, and you'll share its fair prizes.", what) },
+		lines = {
+			string.format("Help raise %s. You can water and care for it, and you'll share its fair prizes.", what),
+		},
 		buttons = {
 			{
 				text = "Let's grow!",
 				onClick = function()
-					task.spawn(NetClient.request, Net.Actions.RespondCoGrow, { ownerUserId = ctx.ownerUserId, accept = true })
+					task.spawn(
+						NetClient.request,
+						Net.Actions.RespondCoGrow,
+						{ ownerUserId = ctx.ownerUserId, accept = true }
+					)
 				end,
 			},
 			{
@@ -207,7 +282,11 @@ function ChampionPanel.showInvite(ctx: { [string]: any })
 				color = Theme.Colors.Surface,
 				textColor = Theme.Colors.Text,
 				onClick = function()
-					task.spawn(NetClient.request, Net.Actions.RespondCoGrow, { ownerUserId = ctx.ownerUserId, accept = false })
+					task.spawn(
+						NetClient.request,
+						Net.Actions.RespondCoGrow,
+						{ ownerUserId = ctx.ownerUserId, accept = false }
+					)
 				end,
 			},
 		},
