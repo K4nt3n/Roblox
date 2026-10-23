@@ -55,11 +55,23 @@ function UIKit.new(className: string, props: Props?, children: { Instance }?): a
 	for _, child in children or {} do
 		child.Parent = inst
 	end
+	UIKit.weigh(inst)
 	-- Parent last so the instance is fully built before it appears.
 	if props and props.Parent then
 		inst.Parent = props.Parent
 	end
 	return inst
+end
+
+-- The body font only comes in regular as an enum, so text using it is set to the
+-- heavier weight from Theme.
+function UIKit.weigh(inst: Instance)
+	if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
+		local text = inst :: any
+		if text.Font == Theme.FontBody then
+			text.FontFace = Font.new(text.FontFace.Family, Theme.FontBodyWeight)
+		end
+	end
 end
 
 function UIKit.corner(radius: UDim?): UICorner
@@ -267,6 +279,7 @@ function UIKit.label(text: string, size: number?, props: Props?): TextLabel
 	for key, value in props or {} do
 		(label :: any)[key] = value
 	end
+	UIKit.weigh(label)
 	return label
 end
 
@@ -281,6 +294,7 @@ function UIKit.paragraph(text: string, props: Props?): TextLabel
 	for key, value in props or {} do
 		(label :: any)[key] = value
 	end
+	UIKit.weigh(label)
 	return label
 end
 

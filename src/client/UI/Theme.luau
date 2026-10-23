@@ -96,8 +96,11 @@ Theme.Style = {
 	FlashStrength = 0.15,
 }
 
-Theme.Font = Enum.Font.FredokaOne
-Theme.FontBody = Enum.Font.GothamMedium
+-- Two fonts: a chunky display font for titles, buttons and numbers, and a soft
+-- rounded font for longer body text (drawn bold, see UIKit.weigh).
+Theme.Font = Enum.Font.LuckiestGuy
+Theme.FontBody = Enum.Font.Nunito
+Theme.FontBodyWeight = Enum.FontWeight.Bold
 
 Theme.Corner = UDim.new(0, 14)
 Theme.CornerSmall = UDim.new(0, 10)
