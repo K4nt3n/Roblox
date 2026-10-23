@@ -113,13 +113,14 @@ Icons.List = {
 	here draw their emoji.
 ]]
 local IMAGES: { [string]: string } = {
-	Carrot = "rbxassetid://100205870927286",
-	Tomato = "rbxassetid://71027614019781",
+	Carrot = "rbxassetid://135067738540280", -- Peter's art
+	Tomato = "rbxassetid://75507724510899", -- Peter's art
 	Corn = "rbxassetid://91307205658871",
 	Strawberry = "rbxassetid://78162361077584",
 	Blueberry = "rbxassetid://136831717832722",
-	Watermelon = "rbxassetid://114485725664716",
-	Pumpkin = "rbxassetid://98254068550528",
+	Watermelon = "rbxassetid://70751184684141", -- Peter's art
+	Pumpkin = "rbxassetid://101621559771007", -- Peter's art
+	Cabbage = "rbxassetid://113377002122844", -- Peter's art
 	Sunflower = "rbxassetid://82534278241710",
 	Seedling = "rbxassetid://111591482395541",
 	Shovel = "rbxassetid://108163588000757",
