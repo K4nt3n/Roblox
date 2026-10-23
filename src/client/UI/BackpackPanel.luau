@@ -1,7 +1,8 @@
 --!strict
 --[[
 	BackpackPanel: what the player owns, read from the server snapshot (no
-	second inventory): seeds, and supplies with the garden tools (ToolsPanel).
+	second inventory): seeds, supplies with the garden tools (ToolsPanel) and
+	the ribbons won at fairs (RibbonPanel).
 	Buying happens at the Seed Shop stand and selling at the Selling Merchant,
 	both in the middle of the map.
 ]]
@@ -13,6 +14,7 @@ local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 local ArtSlot = require(script.Parent.ArtSlot)
 local ToolsPanel = require(script.Parent.ToolsPanel)
+local RibbonPanel = require(script.Parent.RibbonPanel)
 local Teleport = require(script.Parent.Parent.Controllers.Teleport)
 
 local BackpackPanel = {}
@@ -20,6 +22,7 @@ local BackpackPanel = {}
 BackpackPanel.TABS = {
 	{ id = "seeds", text = "Seeds", icon = "Seeds", color = Theme.Colors.Primary },
 	{ id = "supplies", text = "Supplies", icon = "Tools", color = Theme.Colors.Info },
+	{ id = "ribbons", text = "Ribbons", icon = "Ribbon", color = Theme.Colors.Danger },
 } :: { UIKit.TabItem }
 
 -- Set by UIController: closes the panel (before a teleport).
@@ -120,6 +123,8 @@ end
 function BackpackPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: string?)
 	if tab == "supplies" then
 		renderSupplies(body, data)
+	elseif tab == "ribbons" then
+		RibbonPanel.render(body, data)
 	else
 		renderSeeds(body, data)
 	end

@@ -134,6 +134,9 @@ Theme.Size = {
 	-- Reference-style rectangle buttons (HUD nav and menu).
 	ActionButton = Vector2.new(158, 50),
 	ActionButtonPhone = Vector2.new(124, 40),
+	-- Square icon-only HUD buttons (left grid, settings).
+	IconButton = 64,
+	IconButtonPhone = 50,
 	SeedSlot = 76,
 	SeedSlotPhone = 64,
 	PillWidth = 220,
