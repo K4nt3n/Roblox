@@ -11,6 +11,7 @@
 	               ribbons; badge = new ribbons), Upgrades, Fairs (fair waiting for an
 	               entry), Champion (needs care)
 	  Top right    Settings icon
+	  Bottom right countdowns to the hourly, daily and weekly weigh-ins (FairTimers)
 	  Top center   travel buttons: My Garden (your plot) and Shops (Seed Shop, Sell, Fair)
 	Seeds and supplies are bought and veggies sold at the stands in the middle, not from the HUD.
 	  Bottom       seed hotbar (selected seed lifts up)
@@ -40,6 +41,7 @@ local EssenceFX = require(script.Parent.Parent.Feel.EssenceFX)
 
 local Icons = require(script.Parent.Icons)
 local ToolBar = require(script.Parent.ToolBar)
+local FairTimers = require(script.Parent.FairTimers)
 local Teleport = require(script.Parent.Parent.Controllers.Teleport)
 
 local Hud = {}
@@ -459,6 +461,7 @@ local function layoutForDevice()
 	nav.Position = UDim2.new(0, 16 + math.floor(side.Y * SIDE_ICON_SCALE / 2) - 6, 0.5, -40)
 	local slotSize = if phone then Theme.Size.SeedSlotPhone else Theme.Size.SeedSlot
 	ToolBar.resize(slotSize)
+	FairTimers.layout(phone)
 	for _, slot in seedSlots do
 		slot.holder.Size = UDim2.fromOffset(slotSize, slotSize + 12)
 		slot.button.Size = UDim2.fromOffset(slotSize, slotSize)
@@ -602,6 +605,9 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 	buildSettings(onMenu)
 	buildTravel()
 	buildSeedDock()
+	FairTimers.mount(root, function(fair)
+		onMenu("Fair", fair)
+	end)
 	-- Picking a seed puts any garden tool away.
 	local function selectSeed(cropId: string)
 		ToolBar.unequip()

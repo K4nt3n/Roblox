@@ -44,72 +44,144 @@ local function currentEntry(data: { [string]: any }, fairName: string): any
 	return info and entries and entries[tostring(info.id)]
 end
 
+local function muted(text: string, order: number, parent: Instance, props: { [string]: any }?): TextLabel
+	local label = UIKit.paragraph(text, { LayoutOrder = order, TextColor3 = Theme.Colors.TextMuted, Parent = parent })
+	for key, value in props or {} do
+		(label :: any)[key] = value
+	end
+	return label
+end
+
 function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: string?)
 	local selectedFair = if tab and Config.Fair.periods[tab] then tab else FairPanel.DEFAULT_TAB
 	local period = Config.Fair.periods[selectedFair]
-	local fairInfo = data.fairs and data.fairs[selectedFair]
-	local endsAt = if fairInfo then fairInfo.endsAt else 0
 	local entry = currentEntry(data, selectedFair)
 
-	local info = UIKit.card({
+	-- Countdown: when the judges weigh in next.
+	local hero = UIKit.card({
+		Name = "Countdown",
 		Size = UDim2.new(1, -8, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		LayoutOrder = 1,
-		BackgroundColor3 = Theme.lighten(Theme.Colors.Gold, 0.8),
+		Parent = body,
+	}, {
+		UIKit.padding(14),
+		UIKit.list(Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center),
+	})
+	local heroEdge = hero:FindFirstChild("Edge") :: UIStroke
+	heroEdge.Color = Theme.Colors.Gold
+	heroEdge.Transparency = 0
+	heroEdge.Thickness = 3
+	UIKit.label(period.displayName, Theme.TextSize.Large, { LayoutOrder = 1 }).Parent = hero
+	local countdown = UIKit.label("", Theme.TextSize.Huge, { LayoutOrder = 2, TextColor3 = Theme.Colors.Gold })
+	countdown.Parent = hero
+	UIKit.outlineText(countdown, Theme.Style.TitleOutline, true)
+	local caption = UIKit.label(
+		"",
+		Theme.TextSize.Small,
+		{ LayoutOrder = 3, Font = Theme.FontBody, TextColor3 = Theme.Colors.TextMuted }
+	)
+	caption.Parent = hero
+	if RunService:IsStudio() then
+		UIKit.button("Preview show (Studio)", function()
+			task.spawn(NetClient.request, Net.Actions.DebugStartFairDay, { fair = selectedFair })
+		end, { LayoutOrder = 10, Size = UDim2.fromOffset(220, 36), BackgroundColor3 = Theme.Colors.Accent }).Parent =
+			hero
+	end
+	task.spawn(function()
+		while countdown.Parent do
+			local now = ClientState.now()
+			local phase, _, at = FairMath.showPhase(now, period)
+			if phase == "Live" then
+				countdown.Text = "Live now!"
+				caption.Text = "The weigh-in show is on at the Weigh-In Fair stand"
+			else
+				countdown.Text = Format.duration(at - now)
+				caption.Text = "until the judges weigh in"
+			end
+			task.wait(1)
+		end
+	end)
+
+	-- Your entry.
+	local mine = UIKit.card({
+		Name = "Entry",
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = 2,
 		Parent = body,
 	}, {
 		UIKit.padding(12),
 		UIKit.list(Enum.FillDirection.Vertical, 4),
 	})
-	local countdown = UIKit.label("", Theme.TextSize.Large, { LayoutOrder = 1 })
-	countdown.Parent = info
-	local lines = {}
 	if entry then
-		table.insert(lines, string.format("Your entry: %s %s", cropName(entry.cropId), Format.weight(entry.weight)))
+		local crop = Config.Crops[entry.cropId]
+		local top = UIKit.new("Frame", {
+			BackgroundTransparency = 1,
+			LayoutOrder = 1,
+			Size = UDim2.new(1, 0, 0, 48),
+			Parent = mine,
+		})
+		local c = crop and crop.placeholderColor
+		ArtSlot.icon("Seed_" .. tostring(entry.cropId), {
+			size = 48,
+			round = true,
+			color = if c then Color3.fromRGB(c[1], c[2], c[3]) else Theme.Colors.Primary,
+			glyph = string.sub(cropName(entry.cropId), 1, 1),
+			anchor = Vector2.new(0, 0.5),
+			position = UDim2.new(0, 0, 0.5, 0),
+		}).Parent =
+			top
+		UIKit.label("Your entry: " .. cropName(entry.cropId), Theme.TextSize.Large, {
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 58, 0.5, 0),
+			Parent = top,
+		})
+		UIKit.label(Format.weight(entry.weight), Theme.TextSize.Large, {
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, 0, 0.5, 0),
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextColor3 = Theme.Colors.Gold,
+			Parent = top,
+		})
 		local item = entry.item
 		if item then
 			local divisions = {}
 			for _, division in FairMath.divisionsForEntry(item, entry.ctx or {}, period.divisions) do
 				table.insert(divisions, FairMath.divisionName(division.id, Config.Fair.divisions, Config.Crops))
 			end
-			table.insert(lines, "Competing in: " .. table.concat(divisions, ", "))
+			muted("Competing for: " .. table.concat(divisions, ", "), 2, mine)
 		end
 	else
-		table.insert(lines, "No entry yet. Enter a veggie from your Basket!")
+		UIKit.label("No entry yet", Theme.TextSize.Large, { LayoutOrder = 1 }).Parent = mine
+		muted("Talk to the Fair Judge at the Weigh-In Fair stand to enter a veggie.", 2, mine)
 	end
+
+	-- How it works.
+	UIKit.steps("How the weigh-in works", {
+		"Grow and harvest the heaviest veggie you can. Your champion grows the biggest.",
+		"Bring it to the Fair Judge at the Weigh-In Fair stand and pick a fair.",
+		"When the timer hits zero, the judges weigh every entry. The heaviest win ribbons and coins.",
+		"Each veggie enters one fair. A heavier veggie replaces your old entry.",
+	}, 3, body)
+
+	-- What you can win.
 	local divisionNames = {}
 	for _, id in period.divisions do
-		local name = if id == "crop" then "Best of each veggie" else FairMath.divisionName(id, Config.Fair.divisions, Config.Crops)
+		local name = if id == "crop"
+			then "Best of each veggie"
+			else FairMath.divisionName(id, Config.Fair.divisions, Config.Crops)
 		table.insert(divisionNames, name)
 	end
-	table.insert(lines, "Ribbons for: " .. table.concat(divisionNames, ", "))
-	for i, line in lines do
-		UIKit.label(line, Theme.TextSize.Body, {
-			LayoutOrder = 1 + i,
-			Font = Theme.FontBody,
-			TextWrapped = true,
-			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-		}).Parent = info
-	end
+	UIKit.section("Ribbons to win", 4, body)
+	muted(table.concat(divisionNames, "  ·  "), 5, body, { Size = UDim2.new(1, -8, 0, 0) })
 
-	if RunService:IsStudio() then
-		UIKit.button("Preview show (Studio)", function()
-			task.spawn(NetClient.request, Net.Actions.DebugStartFairDay, { fair = selectedFair })
-		end, { LayoutOrder = 10, Size = UDim2.fromOffset(220, 36), BackgroundColor3 = Theme.Colors.Accent }).Parent = info
-	end
-
-	task.spawn(function()
-		while countdown.Parent do
-			countdown.Text = "Judging in " .. Format.duration(endsAt - ClientState.now())
-			task.wait(1)
-		end
-	end)
-
+	-- Leaderboard.
+	UIKit.section("Top growers", 10, body)
 	local board = ClientState.leaderboard
 	local rows = board and board.fairs and board.fairs[selectedFair] and board.fairs[selectedFair].rows or {}
 	if #rows == 0 then
-		UIKit.label("No entries yet. Be the first!", Theme.TextSize.Body, { LayoutOrder = 20, Font = Theme.FontBody }).Parent = body
+		muted("No entries yet. Be the first!", 11, body)
 	end
 	local MEDALS = { Theme.Colors.Gold, Color3.fromRGB(205, 210, 220), Color3.fromRGB(215, 150, 95) }
 	for i, row in rows do
@@ -117,7 +189,6 @@ function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: st
 		local card = UIKit.card({
 			Size = UDim2.new(1, -8, 0, 48),
 			LayoutOrder = 20 + i,
-			BackgroundColor3 = if isMe then Theme.lighten(Theme.Colors.Gold, 0.5) else Theme.Colors.Surface,
 			Parent = body,
 		}, {
 			UIKit.label(string.format("#%d  %s", row.rank, row.name), Theme.TextSize.Body, {
@@ -130,6 +201,13 @@ function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: st
 				TextXAlignment = Enum.TextXAlignment.Right,
 			}),
 		})
+		if isMe then
+			-- Your own row: gold edge instead of a bright fill, so the white text stays readable.
+			local edge = card:FindFirstChild("Edge") :: UIStroke
+			edge.Color = Theme.Colors.Gold
+			edge.Transparency = 0
+			edge.Thickness = 3
+		end
 		if row.rank <= 3 then
 			ArtSlot.icon("Medal_" .. row.rank, {
 				size = 32,
@@ -138,7 +216,8 @@ function FairPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: st
 				glyph = tostring(row.rank),
 				anchor = Vector2.new(0, 0.5),
 				position = UDim2.new(0, 12, 0.5, 0),
-			}).Parent = card
+			}).Parent =
+				card
 		end
 	end
 end
@@ -158,7 +237,9 @@ function FairPanel.pick(item: { [string]: any })
 				local fairInfo = data.fairs and data.fairs[period.id]
 				local left = if fairInfo then Format.duration(fairInfo.endsAt - ClientState.now()) else ""
 				local status = if entry
-					then (if entry.weight >= item.weight then "Your entry is heavier (" .. Format.weight(entry.weight) .. ")" else "Replaces " .. Format.weight(entry.weight))
+					then (if entry.weight >= item.weight
+						then "Your entry is heavier (" .. Format.weight(entry.weight) .. ")"
+						else "Replaces " .. Format.weight(entry.weight))
 					else "No entry yet"
 				local canEnter = not entry or entry.weight < item.weight
 				local button = UIKit.button("Enter", function()
@@ -166,7 +247,8 @@ function FairPanel.pick(item: { [string]: any })
 					close()
 				end, { BackgroundColor3 = Theme.Colors.Gold })
 				UIKit.setEnabled(button, canEnter, nil, "Your entry there is already heavier!")
-				local row = UIKit.row(period.displayName, string.format("Judging in %s · %s", left, status), { button })
+				local row =
+					UIKit.row(period.displayName, string.format("Judging in %s · %s", left, status), { button })
 				row.LayoutOrder = i
 				row.Size = UDim2.new(1, 0, 0, 64)
 				row.Parent = holder
@@ -180,7 +262,9 @@ end
 function FairPanel.showResults(ctx: { [string]: any })
 	local lines = {}
 	if ctx.weight then
-		local who = if ctx.championName then string.format("%s the %s", ctx.championName, cropName(ctx.cropId)) else cropName(ctx.cropId)
+		local who = if ctx.championName
+			then string.format("%s the %s", ctx.championName, cropName(ctx.cropId))
+			else cropName(ctx.cropId)
 		table.insert(lines, string.format("%s weighed %s", who, Format.weight(ctx.weight)))
 	end
 	if ctx.coGrowerNames and #ctx.coGrowerNames > 0 then
@@ -197,7 +281,9 @@ function FairPanel.showResults(ctx: { [string]: any })
 		table.insert(lines, "+" .. Format.coins(ctx.coins) .. " Coins")
 	end
 	Modal.show({
-		title = if ctx.missedShow then "You missed the " .. ctx.fairName .. "! Here's the replay" else ctx.fairName .. " results",
+		title = if ctx.missedShow
+			then "You missed the " .. ctx.fairName .. "! Here's the replay"
+			else ctx.fairName .. " results",
 		lines = lines,
 		accent = Theme.Colors.Gold,
 		buttons = { { text = "Hooray!", color = Theme.Colors.Gold, textColor = Theme.Colors.Text } },
