@@ -3,10 +3,12 @@
 	ToolBar: the garden tools as slots in our own bottom hotbar, left of the seeds.
 	Roblox's default Backpack hotbar is turned off so the two never overlap.
 
-	  Equip / put away: tap or click a slot, keys 1 2 3, or gamepad L1 / R1.
-	  Picking a seed puts the tool away (ToolBar.unequip), and while a tool is
-	  held the seed highlight dims (Hud.setToolActive), so only one is ever active.
-	  The Fertilizer slot shows how many bags are left.
+	  Equip / put away: tap or click a slot, its number key (Hud numbers every
+	  slot left to right), or gamepad L1 / R1.
+	  Picking a seed puts the tool away (ToolBar.unequip) and picking a tool puts
+	  the seed away, so only one thing is ever in hand.
+	  Which tools sit on the hotbar is saved (data.hotbar) and set from
+	  Backpack > Supplies. The Fertilizer slot shows how many bags are left.
 ]]
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -35,9 +37,14 @@ local SHORT_NAME: { [string]: string } = {
 	PestRemover = "Bug Spray",
 	Fertilizer = "Fertilizer",
 }
-local KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three }
-
-type Slot = { holder: Frame, button: TextButton, edge: UIStroke, count: TextLabel?, equipped: boolean }
+type Slot = {
+	holder: Frame,
+	button: TextButton,
+	edge: UIStroke,
+	key: TextLabel,
+	count: TextLabel?,
+	equipped: boolean,
+}
 
 local localPlayer = Players.LocalPlayer
 local slots: { [string]: Slot } = {}
@@ -131,13 +138,35 @@ function ToolBar.toggle(toolId: string)
 	end
 end
 
+-- The tools on the hotbar, left to right.
+function ToolBar.visibleTools(): { string }
+	local list = {}
+	for _, toolId in ORDER do
+		local slot = slots[toolId]
+		if slot and slot.holder.Visible then
+			table.insert(list, toolId)
+		end
+	end
+	return list
+end
+
+-- Sets the keybind shown in the slot's corner (nil hides it).
+function ToolBar.setKey(toolId: string, text: string?)
+	local slot = slots[toolId]
+	if slot then
+		slot.key.Text = text or ""
+		slot.key.Visible = text ~= nil
+	end
+end
+
 local function cycle(step: number)
-	local index = table.find(ORDER, equippedId or "") or (if step > 0 then 0 else #ORDER + 1)
+	local list = ToolBar.visibleTools()
+	local index = table.find(list, equippedId or "") or (if step > 0 then 0 else #list + 1)
 	local nextIndex = index + step
-	if nextIndex < 1 or nextIndex > #ORDER then
+	if nextIndex < 1 or nextIndex > #list then
 		ToolBar.unequip()
 	else
-		ToolBar.toggle(ORDER[nextIndex])
+		ToolBar.toggle(list[nextIndex])
 	end
 end
 
@@ -171,11 +200,11 @@ local function makeSlot(parent: Instance, toolId: string, index: number)
 	-- Big and centred, and it grows and shrinks with the slot (phone sizes).
 	icon.Size = UDim2.fromScale(ICON_SCALE, ICON_SCALE)
 	icon.Parent = button
-	UIKit.slotKey(button, tostring(index))
 	slots[toolId] = {
 		holder = holder,
 		button = button,
 		edge = button:FindFirstChild("Edge") :: UIStroke,
+		key = UIKit.slotKey(button, tostring(index)),
 		count = if def and def.supply then UIKit.slotCount(button) else nil,
 		equipped = false,
 	}
@@ -224,21 +253,33 @@ function ToolBar.mount(hotbar: Instance)
 		if state ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass
 		end
-		local index = table.find(KEYS, input.KeyCode)
-		if index then
-			ToolBar.toggle(ORDER[index])
-		elseif input.KeyCode == Enum.KeyCode.ButtonR1 then
+		if input.KeyCode == Enum.KeyCode.ButtonR1 then
 			cycle(1)
 		elseif input.KeyCode == Enum.KeyCode.ButtonL1 then
 			cycle(-1)
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonR1)
+	end, false, Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonR1)
 end
 
--- Keeps the fertilizer badge in sync with the snapshot.
+-- Whether the player keeps this tool on the hotbar (on unless they took it off).
+function ToolBar.onHotbar(data: { [string]: any }, toolId: string): boolean
+	return not (data.hotbar and data.hotbar[toolId] == false)
+end
+
+-- Shows the tools the player keeps on the hotbar and keeps the fertilizer badge in sync.
 function ToolBar.render(data: { [string]: any })
+	local anyVisible = false
 	for toolId, slot in slots do
+		local visible = ToolBar.onHotbar(data, toolId)
+		if visible and not slot.holder.Visible then
+			Tweens.pop(slot.button, 0.3)
+		elseif not visible and equippedId == toolId then
+			-- Taken off the hotbar while in hand.
+			ToolBar.unequip()
+		end
+		slot.holder.Visible = visible
+		anyVisible = anyVisible or visible
 		local def = Config.Tools.items[toolId]
 		local count = slot.count
 		if count and def and def.supply then
@@ -248,6 +289,9 @@ function ToolBar.render(data: { [string]: any })
 			count.TextColor3 = if bags > 0 then Theme.Colors.TextOnPrimary else Theme.Colors.Danger
 			count.Visible = true
 		end
+	end
+	if divider then
+		divider.Visible = anyVisible
 	end
 end
 

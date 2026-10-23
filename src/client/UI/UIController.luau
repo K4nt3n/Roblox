@@ -65,6 +65,7 @@ local localPlayer = Players.LocalPlayer
 local REASONS: { [string]: string } = {
 	NotEnoughCoins = "Not enough Coins yet!",
 	NoSeeds = "Out of those seeds. Visit the Seed Shop!",
+	NoSeedPicked = "Pick a seed in your hotbar first!",
 	LevelLocked = "Reach a higher level to unlock that!",
 	Cooldown = "Already watered. Give it a moment!",
 	Maxed = "That's as big as it gets!",

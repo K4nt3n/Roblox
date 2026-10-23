@@ -25,7 +25,8 @@ Net.Remotes = {
 }
 
 Net.Actions = {
-	SelectSeed = "SelectSeed", -- { cropId }
+	SelectSeed = "SelectSeed", -- { cropId } "" puts the seed away
+	SetHotbarTool = "SetHotbarTool", -- { toolId, on }
 	BuySeed = "BuySeed", -- { cropId, amount }
 	BuyUpgrade = "BuyUpgrade", -- { upgradeId }
 	BuyPlot = "BuyPlot", -- {}

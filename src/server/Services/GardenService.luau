@@ -63,6 +63,8 @@ function GardenService:Start()
 
 	DataService.ProfileLoaded:Connect(function(player, data, info)
 		pendingClaims[player] = info
+		-- Nothing is in hand when you join.
+		data.selectedSeed = ""
 		if player.Parent then
 			local ok, reason = self:ClaimGarden(player, nil)
 			if not ok and reason ~= "AlreadyClaimed" then
@@ -111,10 +113,21 @@ function GardenService:Start()
 	NetService:Handle(Net.Actions.SelectSeed, function(player, payload)
 		local data = DataService:Get(player)
 		local cropId = payload.cropId
-		if not data or type(cropId) ~= "string" or not Config.Crops[cropId] then
+		if not data or type(cropId) ~= "string" or (cropId ~= "" and not Config.Crops[cropId]) then
 			return false, "UnknownCrop"
 		end
 		data.selectedSeed = cropId
+		DataService:MarkDirty(player)
+		return true, nil
+	end)
+
+	NetService:Handle(Net.Actions.SetHotbarTool, function(player, payload)
+		local data = DataService:Get(player)
+		local toolId = payload.toolId
+		if not data or type(toolId) ~= "string" or not Config.Tools.items[toolId] then
+			return false, "UnknownTool"
+		end
+		data.hotbar[toolId] = payload.on == true
 		DataService:MarkDirty(player)
 		return true, nil
 	end)
@@ -232,6 +245,9 @@ function GardenService:PrimaryAction(player: Player, plotId: string): (boolean, 
 	end
 	local plant = data.plots[plotId]
 	if not plant then
+		if not Config.Crops[data.selectedSeed] then
+			return false, "NoSeedPicked"
+		end
 		return self:Plant(player, plotId, data.selectedSeed)
 	end
 	local crop = Config.Crops[plant.cropId]
