@@ -125,11 +125,17 @@ All UI is built in code, in design pixels at a 1280x720 reference.
 
 - `UI/Theme.luau`: colors, panel accents, spacing, text sizes, touch sizes, ScreenGui layers and the
   art slot table. Restyle the game here.
-- The look ("big Roblox game" shine) is all code and tuned in `Theme.Style`: candy palette, top-to-bottom
-  gradients with a darker bottom edge (`Theme.gradient`), thick dark outlines, white text with a dark
-  outline, a gloss strip on buttons, a shine that sweeps across key buttons (`UIKit.keyButton` /
-  `UIKit.sweep`), soft drop shadows under HUD pills and seed slots, and white/gold flashes with bouncy pops
-  on rewards (`Tweens.flash`, `Hud.celebrate`).
+- The look is all code and tuned in `Theme.Style`. It mixes Peter's two references: clean white panels with
+  near-black edges and a colored title bar, and "studded" colored buttons with flat saturated faces, a darker
+  lip along the bottom (`Theme.gradient`, `Style.Lip`), a subtle square-stud texture (`UI/Studs.luau`,
+  `Style.Studs` / `StudSize` / `StudTransparency`), thick dark outlines and white text with a heavy dark
+  stroke. A shine sweeps across key buttons (`UIKit.keyButton` / `UIKit.sweep`), HUD pills and seed slots get
+  soft drop shadows, and rewards get white/gold flashes with bouncy pops (`Tweens.flash`, `Hud.celebrate`).
+  The gloss strip from the first pass is still there, off (`Style.Gloss`).
+- Studs: the tile is drawn in code with an EditableImage. If Peter uploads his own tile (one stud, seamless),
+  set `Theme.Art.StudTile` and it is used instead. If neither is available the faces just stay flat.
+- HUD fair timers: under the level pill, one row per fair with an icon slot (`Timer_<fairId>`) and
+  "In 15m 57s". The last minute turns gold; tapping a row opens that fair's tab.
 - `UI/Scale.luau`: one responsive scale. `Scale.root(screenGui)` returns a scaled full-screen frame; phones,
   tablets and big monitors all get sensible sizes, and `Scale.device` drives layout changes (smaller menu
   and seed slots on phones, hotbar kept clear of the thumbstick and jump button).
@@ -160,7 +166,8 @@ All UI is built in code, in design pixels at a 1280x720 reference.
 | Map | Any `Workspace.Map` or `Workspace.Baseplate` | Generated ground |
 | Fair stage | `Workspace.FairStage` with parts `Floor`, `Scale` and `CameraPoint` (the camera looks along it) | Generated stage |
 | Essence orbs | Set `EssenceFX.template` to a GuiObject (e.g. a sparkle ImageLabel) | Glowing round frames |
-| UI icons | Asset ids in `Theme.Art`: `CoinIcon`, `LevelIcon`, `Menu<Shop/Market/Fair/Champion/Ribbons>`, `PanelIcon_<panel>`, `ChampionPortrait`, plus `Seed_<cropId>`, `Upgrade_<id>`, `Ribbon_<color>`, `Medal_<1-3>` | Flat colored shapes with a letter |
+| UI icons | Asset ids in `Theme.Art`: `CoinIcon`, `LevelIcon`, `Menu<Shop/Market/Fair/Champion/Ribbons>`, `PanelIcon_<panel>` (empty reuses `Menu<panel>`), `ChampionPortrait`, `Timer_<fairId>`, plus `Seed_<cropId>`, `Upgrade_<id>`, `Ribbon_<color>`, `Medal_<1-3>` | Flat colored shapes with a letter |
+| Stud texture | `Theme.Art.StudTile` (one seamless stud, tiled) | Stud tile drawn in code |
 | UI frames | `Theme.Art.PanelFrame` / `ButtonFace` (9-slice, set `Theme.ArtSlice`) | Flat rounded frames |
 | UI look | `UI/Theme.luau` tokens and `UI/UIKit.luau` builders | Rounded placeholder UI |
 

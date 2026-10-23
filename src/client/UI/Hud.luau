@@ -5,6 +5,7 @@
 
 	  Top left     coin pill (rolls up, coins fly into it on a sale)
 	               level pill (badge + XP bar, filled by essence via LevelBar)
+	               fair timers (icon + "In 15m 57s" per fair; tap opens that fair)
 	  Right        menu buttons with badges (basket count, champion needs care,
 	               fair waiting for an entry, new ribbons)
 	  Bottom       seed hotbar (selected seed lifts up)
@@ -13,7 +14,7 @@
 	Fly-to targets for effects (harvest -> basket in G4, coins, essence):
 	    Hud.target("Coins" | "Level" | "Market" | "Shop" | "Fair" | "Champion" | "Ribbons" | "Seeds")
 
-	Art slots: CoinIcon, LevelIcon, Menu<Panel>, Seed_<cropId> (see Theme.Art).
+	Art slots: CoinIcon, LevelIcon, Menu<Panel>, Seed_<cropId>, Timer_<fairId> (see Theme.Art).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +22,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Format = require(Shared.Format)
+local FairMath = require(Shared.FairMath)
+local ClientState = require(script.Parent.Parent.ClientState)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 local ArtSlot = require(script.Parent.ArtSlot)
@@ -55,6 +58,7 @@ local menuBadges: { [string]: Frame } = {}
 local seedSlots: { [string]: { holder: Frame, button: TextButton, count: TextLabel, edge: UIStroke, shadow: Frame?, selected: boolean } } =
 	{}
 
+local timers: { [string]: { row: TextButton, label: TextLabel, endsAt: number, live: boolean } } = {}
 local coinPending: number? = nil
 local dockHidden = false
 
@@ -101,6 +105,7 @@ local function buildStats()
 	UIKit.paint(coinPill, Theme.Colors.Gold)
 	UIKit.outline(coinPill)
 	UIKit.gloss(coinPill)
+	UIKit.studs(coinPill)
 	UIKit.shadow(coinPill)
 	ArtSlot.icon("CoinIcon", {
 		size = 54,
@@ -139,7 +144,7 @@ local function buildStats()
 		ZIndex = 2,
 		Parent = stats,
 	}, { UIKit.corner(Theme.CornerRound) })
-	UIKit.paint(levelPill, Theme.lighten(Theme.Style.Outline, 0.18))
+	UIKit.paint(levelPill, Theme.Colors.Surface, false)
 	UIKit.outline(levelPill)
 	UIKit.shadow(levelPill)
 	local badge = ArtSlot.icon("LevelIcon", {
@@ -164,7 +169,7 @@ local function buildStats()
 	UIKit.outlineText(levelNumber, Theme.Style.TitleOutline)
 	local track = UIKit.new("Frame", {
 		Name = "Track",
-		BackgroundColor3 = Theme.darken(Theme.Style.Outline, 0.3),
+		BackgroundColor3 = Theme.darken(Theme.Colors.SurfaceAlt, 0.1),
 		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(30, 6),
 		Size = UDim2.new(1, -37, 1, -12),
@@ -177,7 +182,7 @@ local function buildStats()
 		Size = UDim2.fromScale(0, 1),
 		Parent = track,
 	}, { UIKit.corner(Theme.CornerRound) })
-	UIKit.paint(fill, Theme.Colors.Primary)
+	UIKit.paint(fill, Theme.Colors.Info)
 	UIKit.gloss(fill)
 	local xpLabel = UIKit.label("", Theme.TextSize.Small, {
 		Name = "Xp",
@@ -190,6 +195,92 @@ local function buildStats()
 	})
 	UIKit.outlineText(xpLabel, 2)
 	LevelBar.mount(levelPill, fill, xpLabel, levelNumber)
+end
+
+-- Countdown text for a fair: "In 15m 57s", or "Judging!" once it is due.
+local function timerText(seconds: number): string
+	return if seconds > 0 then "In " .. Format.duration(seconds) else "Judging!"
+end
+
+local function updateTimers()
+	local now = ClientState.now()
+	for _, timer in timers do
+		if timer.endsAt <= 0 then
+			timer.row.Visible = false
+			continue
+		end
+		timer.row.Visible = true
+		local left = timer.endsAt - now
+		local text = timerText(left)
+		if timer.label.Text ~= text then
+			timer.label.Text = text
+		end
+		-- The last minute turns gold and ticks with a small pop.
+		local close = left > 0 and left <= 60
+		timer.label.TextColor3 = if close then Theme.Colors.Gold else Theme.Colors.TextOnPrimary
+		if close then
+			Tweens.pop(timer.label, 0.06)
+		end
+		local live = left <= 0
+		if live and not timer.live then
+			Tweens.pop(timer.row, 0.2)
+		end
+		timer.live = live
+	end
+end
+
+-- Next judging for every fair, under the level pill. Tapping one opens that fair.
+local function buildTimers(onFair: (fairId: string) -> ())
+	local holder = UIKit.new("Frame", {
+		Name = "FairTimers",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(16, 128),
+		Size = UDim2.fromOffset(Theme.Size.PillWidth, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = root,
+	}, { UIKit.list(Enum.FillDirection.Vertical, 4) })
+	for i, period in FairMath.sortedPeriods(Config.Fair.periods) do
+		local color = Theme.FairColor[period.id] or Theme.Colors.Gold
+		local row = UIKit.new("TextButton", {
+			Name = period.id,
+			BackgroundTransparency = 1,
+			AutoButtonColor = false,
+			Text = "",
+			LayoutOrder = i,
+			Size = UDim2.fromOffset(Theme.Size.PillWidth, 38),
+			Visible = false,
+			Parent = holder,
+		})
+		ArtSlot.icon("Timer_" .. period.id, {
+			size = 36,
+			color = color,
+			glyph = string.sub(period.displayName, 1, 1),
+			anchor = Vector2.new(0, 0.5),
+			position = UDim2.new(0, 0, 0.5, 0),
+			zIndex = 2,
+		}).Parent =
+			row
+		local label = UIKit.label("", Theme.TextSize.Large, {
+			Name = "Countdown",
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 44, 0.5, 0),
+			TextColor3 = Theme.Colors.TextOnPrimary,
+			ZIndex = 2,
+			Parent = row,
+		})
+		UIKit.outlineText(label, Theme.Style.TitleOutline)
+		row.Activated:Connect(function()
+			Tweens.pop(row, 0.1)
+			onFair(period.id)
+		end)
+		timers[period.id] = { row = row, label = label, endsAt = 0, live = false }
+	end
+	task.spawn(function()
+		while holder.Parent do
+			updateTimers()
+			task.wait(1)
+		end
+	end)
 end
 
 local function buildMenu(onMenu: (panel: string) -> ())
@@ -214,7 +305,7 @@ local function buildMenu(onMenu: (panel: string) -> ())
 		})
 		local corner = button:FindFirstChildOfClass("UICorner")
 		if corner then
-			corner.CornerRadius = UDim.new(0, 18)
+			corner.CornerRadius = Theme.Corner
 		end
 		ArtSlot.icon("Menu" .. entry.panel, {
 			size = 38,
@@ -397,7 +488,12 @@ end
 -- Public
 ---------------------------------------------------------------------------
 
-function Hud.build(playerGui: Instance, onMenu: (panel: string) -> (), onSeed: (cropId: string) -> ())
+function Hud.build(
+	playerGui: Instance,
+	onMenu: (panel: string) -> (),
+	onSeed: (cropId: string) -> (),
+	onFair: ((fairId: string) -> ())?
+)
 	local gui = UIKit.new("ScreenGui", {
 		Name = "GVF_UI",
 		ResetOnSpawn = false,
@@ -417,6 +513,9 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string) -> (), onSeed: (
 	Toasts.mount(Scale.root(toastGui, "Toasts"))
 
 	buildStats()
+	buildTimers(onFair or function(_fairId: string)
+		onMenu("Fair")
+	end)
 	buildMenu(onMenu)
 	buildSeedDock()
 	for i, crop in cropOrder() do
@@ -432,6 +531,11 @@ function Hud.render(data: { [string]: any })
 	LevelBar.setTarget(data.level, data.xp, data.xpToNext or 1)
 	renderSeeds(data)
 	UIKit.setBadge(menuBadges.Market, #(data.produce or {}))
+	for id, timer in timers do
+		local info = data.fairs and data.fairs[id]
+		timer.endsAt = if info then info.endsAt or 0 else 0
+	end
+	updateTimers()
 end
 
 -- Coins from the server. Held back while coins are still flying in.

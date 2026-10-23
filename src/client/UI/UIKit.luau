@@ -18,7 +18,9 @@
 	  UIKit.tabs(parent, items, selected, onSelect)  segmented control with a sliding highlight
 	  UIKit.badge(parent)  + UIKit.setBadge(badge, value)  notification dot / count
 	Finish (all tuned in Theme.Style)
-	  UIKit.paint(gui, color)    candy gradient on a white base (call again to recolor)
+	  UIKit.paint(gui, color, lip)  face color with a darker bottom lip on a white base
+	                                (call again to recolor; lip false for flat bars)
+	  UIKit.studs(gui)           square-stud texture on a colored face (see UI/Studs)
 	  UIKit.outlineText(text)    dark outline around white text
 	  UIKit.gloss(gui)           glossy strip across the top half
 	  UIKit.sweep(gui)           a shine that sweeps across now and then (key buttons)
@@ -29,6 +31,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(script.Parent.Theme)
 local ArtSlot = require(script.Parent.ArtSlot)
+local Studs = require(script.Parent.Studs)
 local Tweens = require(script.Parent.Parent.Feel.Tweens)
 local EssenceFX = require(script.Parent.Parent.Feel.EssenceFX)
 local FeelController = require(script.Parent.Parent.Feel.FeelController)
@@ -102,10 +105,13 @@ end
 -- Finish: gradients, outlines, gloss, shine, shadows
 ---------------------------------------------------------------------------
 
--- Candy gradient for `color` on a white base. Calling it again recolors (disabled, selected...).
-function UIKit.paint(gui: GuiObject, color: Color3)
+-- Face gradient for `color` on a white base. Calling it again recolors (disabled, selected...).
+function UIKit.paint(gui: GuiObject, color: Color3, lip: boolean?)
 	gui.BackgroundColor3 = Color3.new(1, 1, 1)
 	gui:SetAttribute("PaintColor", color)
+	if lip ~= nil then
+		gui:SetAttribute("PaintLip", lip)
+	end
 	local gradient = gui:FindFirstChild("Paint") :: UIGradient?
 	if not gradient then
 		local old = gui:FindFirstChild("Shine")
@@ -114,7 +120,12 @@ function UIKit.paint(gui: GuiObject, color: Color3)
 		end
 		gradient = UIKit.new("UIGradient", { Name = "Paint", Rotation = 90, Parent = gui })
 	end
-	(gradient :: UIGradient).Color = Theme.gradient(color)
+	(gradient :: UIGradient).Color = Theme.gradient(color, gui:GetAttribute("PaintLip") ~= false)
+end
+
+-- Square-stud texture over a colored face (under its text and icons).
+function UIKit.studs(gui: GuiObject): ImageLabel?
+	return Studs.apply(gui)
 end
 
 -- The thick dark outline around a shape.
@@ -352,6 +363,10 @@ function UIKit.button(text: string, onClick: () -> (), props: Props?): TextButto
 	if not ArtSlot.skin(button, "ButtonFace") then
 		UIKit.paint(button, color)
 		UIKit.gloss(button)
+		-- Studs on colored buttons only; white ones stay clean.
+		if Theme.luminance(color) < 0.86 then
+			UIKit.studs(button)
+		end
 	end
 
 	-- Text above the gloss, mirrored from the button so callers can keep setting button.Text.
@@ -488,7 +503,7 @@ function UIKit.requestButton(text: string, action: string, payload: { [string]: 
 	return button
 end
 
--- A small round notification badge in the top-right corner of `parent`.
+-- A small red notification badge (rounded square) in the top-right corner of `parent`.
 function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 	local badge = UIKit.new("Frame", {
 		Name = "Badge",
@@ -502,7 +517,7 @@ function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 		ZIndex = 5,
 		Parent = parent,
 	}, {
-		UIKit.corner(Theme.CornerRound),
+		UIKit.corner(UDim.new(0, 6)),
 		UIKit.stroke(Theme.Style.Outline, 2.5),
 		UIKit.new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
 		UIKit.new("UISizeConstraint", { MinSize = Vector2.new(24, 24) }),
@@ -516,7 +531,7 @@ function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 		ZIndex = 6,
 		Parent = badge,
 	})
-	UIKit.paint(badge, color or Theme.Colors.Danger)
+	UIKit.paint(badge, color or Theme.Colors.Danger, false)
 	UIKit.outlineText(badge:FindFirstChild("Count") :: TextLabel, 2)
 	return badge
 end
@@ -589,6 +604,7 @@ function UIKit.tabs(
 	UIKit.paint(highlight, color or Theme.Colors.Primary)
 	UIKit.outline(highlight, 2.5)
 	UIKit.gloss(highlight)
+	UIKit.studs(highlight)
 
 	local buttons: { [string]: TextButton } = {}
 	local current = ""
@@ -677,14 +693,14 @@ function UIKit.panel(
 		Visible = false,
 	})
 	panel:SetAttribute("Accent", accent)
-	UIKit.corner(UDim.new(0, 22)).Parent = panel
+	UIKit.corner(Theme.CornerPanel).Parent = panel
 	if not ArtSlot.skin(panel, "PanelFrame") then
 		UIKit.outline(panel, Theme.Style.PanelOutlineThickness)
-		-- Body tinted with the panel's color, fading to cream.
+		-- Clean white body, a touch greyer at the bottom.
 		UIKit.new("UIGradient", {
 			Name = "Paint",
 			Rotation = 90,
-			Color = ColorSequence.new(Theme.lighten(accent, 0.78), Theme.Colors.Background),
+			Color = ColorSequence.new(Theme.Colors.Background, Theme.darken(Theme.Colors.Background, 0.04)),
 			Parent = panel,
 		})
 	end
@@ -697,8 +713,9 @@ function UIKit.panel(
 		Size = UDim2.new(1, 0, 0, 64),
 		Parent = panel,
 	})
-	UIKit.paint(header, accent)
+	UIKit.paint(header, accent, false)
 	UIKit.gloss(header)
+	UIKit.studs(header)
 	-- Dark line under the header, as if the outline runs across the panel.
 	UIKit.new("Frame", {
 		Name = "HeaderLine",
@@ -737,10 +754,6 @@ function UIKit.panel(
 		ZIndex = 3,
 		Parent = header,
 	})
-	local closeCorner = close:FindFirstChildOfClass("UICorner")
-	if closeCorner then
-		closeCorner.CornerRadius = Theme.CornerRound
-	end
 
 	-- Optional persistent tab bar between header and body.
 	UIKit.new("Frame", {
