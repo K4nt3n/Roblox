@@ -9,8 +9,7 @@
 	* On join, a "welcome back" summary lists what ripened while you were away.
 	* A light server loop watches for stage changes so it can fire feel events
 	  (e.g. "your pumpkin just became a Giant!") without the client polling.
-	* New arrivals claim a free garden slot (prompt or "Pick for me"); if they
-	  don't choose within Config.World.autoPickSeconds, one is picked for them.
+	* New arrivals are given a free garden slot as soon as their profile loads.
 ]]
 
 local Players = game:GetService("Players")
@@ -64,17 +63,11 @@ function GardenService:Start()
 
 	DataService.ProfileLoaded:Connect(function(player, data, info)
 		pendingClaims[player] = info
-		task.delay(Config.World.autoPickSeconds, function()
-			if pendingClaims[player] and player.Parent then
-				self:ClaimGarden(player, nil)
+		if player.Parent then
+			local ok, reason = self:ClaimGarden(player, nil)
+			if not ok and reason ~= "AlreadyClaimed" then
+				NetService:Feedback(player, Net.Feedback.Denied, { action = Net.Actions.ClaimPlot, reason = reason })
 			end
-		end)
-	end)
-
-	PlotService.ClaimRequested:Connect(function(player, slot)
-		local ok, reason = self:ClaimGarden(player, slot)
-		if not ok and reason ~= "AlreadyClaimed" then
-			NetService:Feedback(player, Net.Feedback.Denied, { action = Net.Actions.ClaimPlot, reason = reason })
 		end
 	end)
 

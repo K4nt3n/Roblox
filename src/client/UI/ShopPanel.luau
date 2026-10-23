@@ -1,8 +1,9 @@
 --!strict
 --[[
-	ShopPanel: seeds (+ supplies like fertilizer bags), upgrades and the garden
-	(plots + honest skip-the-wait), one tab each. Every price comes from the
-	server snapshot or Config.
+	ShopPanel: seeds (+ supplies like fertilizer bags) and the garden (plots +
+	honest skip-the-wait), one tab each. Opened from the Seed Shop stand in the
+	middle of the map. Upgrades are their own HUD panel (ShopPanel.renderUpgrades).
+	Every price comes from the server snapshot or Config.
 
 	Buttons that can't be used yet stay visible but greyed out, and tapping
 	them says why ("Reach level 3 first!") instead of doing nothing.
@@ -27,7 +28,6 @@ local ShopPanel = {}
 ShopPanel.TABS = {
 	{ id = "seeds", text = "Seeds", icon = "Seeds", color = Theme.Colors.Primary },
 	{ id = "supplies", text = "Supplies", icon = "Tools", color = Theme.Colors.Info },
-	{ id = "upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
 	{ id = "garden", text = "Garden", icon = "Fence", color = Theme.Colors.Gold },
 } :: { UIKit.TabItem }
 
@@ -146,7 +146,7 @@ local function renderSupplies(body: ScrollingFrame, data: { [string]: any })
 		addBuyFive(card, Net.Actions.BuySupply, { supplyId = id, amount = 5 }, data.coins >= def.cost * 5, NOT_ENOUGH)
 		card.Parent = grid
 	end
-	UIKit.paragraph("Equip a garden tool from your hotbar or the Tools button, then tap a plant to use it.", {
+	UIKit.paragraph("Equip a garden tool from your hotbar or Backpack > Supplies, then tap a plant to use it.", {
 		LayoutOrder = 2,
 		TextSize = Theme.TextSize.Small,
 		TextColor3 = Theme.Colors.TextMuted,
@@ -288,11 +288,12 @@ local function renderGarden(body: ScrollingFrame, data: { [string]: any })
 	end
 end
 
+-- The Upgrades panel (its own HUD button, not a Shop tab).
+ShopPanel.renderUpgrades = renderUpgrades
+
 function ShopPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: string?)
 	if tab == "supplies" then
 		renderSupplies(body, data)
-	elseif tab == "upgrades" then
-		renderUpgrades(body, data)
 	elseif tab == "garden" then
 		renderGarden(body, data)
 	else

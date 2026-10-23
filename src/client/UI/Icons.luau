@@ -197,6 +197,7 @@ Icons.Slots = {
 	PanelIcon_Ribbons = "Ribbon",
 	PanelIcon_Backpack = "Backpack",
 	PanelIcon_Tools = "Tools",
+	PanelIcon_Upgrades = "Upgrades",
 	PanelIcon_Settings = "Settings",
 	ChampionPortrait = "Crown",
 	Upgrade_wateringCan = "WateringCan",

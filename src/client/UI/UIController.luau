@@ -3,7 +3,8 @@
 	UIController: owns the screens and routes game events to them.
 
 	HUD:     UI/Hud (coins, level bar, menu with badges, seed hotbar, toasts).
-	Panels:  Shop, Basket (Market), Fairs, Champion, Ribbons. One open at a
+	Panels:  Shop + Sell (Market) (opened at the stands), Backpack, Upgrades,
+	         Settings, Fairs, Champion, Ribbons. One open at a
 	         time, over a dimmed, blurred backdrop. Tap outside, press X or
 	         gamepad B to close. Opening another panel cross-fades.
 	Modals:  fair picker, results / replay cards, co-grow invites, naming (UI/Modal).
@@ -380,7 +381,7 @@ function UIController.isOpen(name: string?): boolean
 	return if name then openPanel == name else openPanel ~= nil
 end
 
--- HUD element to fly effects into: "Coins", "Level", "Seeds" or a menu panel name.
+-- HUD element to fly effects into: "Coins", "Level", "Seeds" or a HUD button name.
 function UIController.target(name: string): GuiObject?
 	return Hud.target(name)
 end
@@ -396,9 +397,10 @@ local function registerBuiltIns()
 		defaultTab = "seeds",
 		render = ShopPanel.render,
 	})
+	-- Internal name stays "Market" (the stand's OpensPanel attribute); players see "Sell".
 	UIController.registerPanel("Market", {
-		title = "Basket",
-		glyph = "B",
+		title = "Sell",
+		glyph = "S",
 		render = BasketPanel.render,
 	})
 	UIController.registerPanel("Fair", {
@@ -425,18 +427,17 @@ local function registerBuiltIns()
 		defaultTab = "seeds",
 		render = BackpackPanel.render,
 	})
-	UIController.registerPanel("Tools", {
-		title = "Garden Tools",
-		glyph = "T",
-		render = ToolsPanel.render,
+	UIController.registerPanel("Upgrades", {
+		title = "Upgrades",
+		glyph = "U",
+		render = ShopPanel.renderUpgrades,
 	})
 	UIController.registerPanel("Settings", {
 		title = "Settings",
 		glyph = "S",
 		render = SettingsPanel.render,
 	})
-	BackpackPanel.open = UIController.open
-	ToolsPanel.open = UIController.open
+	BackpackPanel.close = UIController.close
 	ToolsPanel.close = UIController.close
 	SettingsPanel.refresh = function()
 		renderPanel("Settings", true)
@@ -551,7 +552,7 @@ local function onFeel(name: string, ctx: { [string]: any })
 		if ctx.xp and ctx.xp > 0 then
 			LevelBar.essence(ctx.position, ctx.xp)
 		end
-		Hud.celebrate("Market", nil, if ctx.isGiant then 0.25 else 0.12)
+		Hud.celebrate("Backpack", nil, if ctx.isGiant then 0.25 else 0.12)
 	elseif name == Net.Feedback.Sold then
 		Hud.coinBurst(ctx.coins or 0, pressOrigin())
 		UIController.notify("Reward", "You earned " .. Format.coins(ctx.coins or 0) .. " Coins!", "From selling your crops", "Coins")

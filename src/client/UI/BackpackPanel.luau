@@ -1,31 +1,29 @@
 --!strict
 --[[
-	BackpackPanel: everything the player owns, read from the server snapshot
-	(no second inventory): seeds, supplies and harvested veggies (the Basket).
-	Selling still happens in the Basket panel; this view links to it.
+	BackpackPanel: what the player owns, read from the server snapshot (no
+	second inventory): seeds, and supplies with the garden tools (ToolsPanel).
+	Buying happens at the Seed Shop stand and selling at the Selling Merchant,
+	both in the middle of the map.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
-local Format = require(ReplicatedStorage.Shared.Format)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 local ArtSlot = require(script.Parent.ArtSlot)
+local ToolsPanel = require(script.Parent.ToolsPanel)
+local Teleport = require(script.Parent.Parent.Controllers.Teleport)
 
 local BackpackPanel = {}
 
 BackpackPanel.TABS = {
 	{ id = "seeds", text = "Seeds", icon = "Seeds", color = Theme.Colors.Primary },
 	{ id = "supplies", text = "Supplies", icon = "Tools", color = Theme.Colors.Info },
-	{ id = "harvest", text = "Harvest", icon = "Basket", color = Theme.Colors.Accent },
 } :: { UIKit.TabItem }
 
--- Set by UIController: opens another panel (Basket to sell, Shop to buy).
-BackpackPanel.open = function(_name: string, _tab: string?) end
-
--- Most veggies shown at once (heaviest first); the Basket lists them all.
-local MAX_HARVEST = 24
+-- Set by UIController: closes the panel (before a teleport).
+BackpackPanel.close = function() end
 
 local function cropIcon(cropId: string): GuiObject
 	local crop = Config.Crops[cropId]
@@ -37,10 +35,11 @@ local function cropIcon(cropId: string): GuiObject
 	})
 end
 
-local function empty(body: ScrollingFrame, text: string, buttonText: string, panel: string, tab: string?)
+local function empty(body: ScrollingFrame, text: string)
 	UIKit.paragraph(text, { LayoutOrder = 1, TextColor3 = Theme.Colors.TextMuted }).Parent = body
-	UIKit.button(buttonText, function()
-		BackpackPanel.open(panel, tab)
+	UIKit.button("Go to the Shops", function()
+		BackpackPanel.close()
+		Teleport.toShops()
 	end, { LayoutOrder = 2, Size = UDim2.fromOffset(200, 44), BackgroundColor3 = Theme.Colors.Primary }).Parent = body
 end
 
@@ -56,7 +55,7 @@ local function renderSeeds(body: ScrollingFrame, data: { [string]: any })
 		return a.order < b.order
 	end)
 	if #crops == 0 then
-		empty(body, "No seeds yet.", "Buy seeds", "Shop", "seeds")
+		empty(body, "No seeds yet. Buy them at the Seed Shop in the middle of the map!")
 		return
 	end
 	local grid = UIKit.grid(1, body, Vector2.new(124, 140))
@@ -84,15 +83,28 @@ local function renderSeeds(body: ScrollingFrame, data: { [string]: any })
 	end
 end
 
+-- Garden tools first (equip from here), then any supplies no tool card already counts.
 local function renderSupplies(body: ScrollingFrame, data: { [string]: any })
+	ToolsPanel.render(body, data, 1)
+	local onTool: { [string]: boolean } = {}
+	for _, def in Config.Tools.items do
+		if def.supply then
+			onTool[def.supply] = true
+		end
+	end
 	local ids = {}
 	for id in Config.Supplies do
-		table.insert(ids, id)
+		if not onTool[id] then
+			table.insert(ids, id)
+		end
+	end
+	if #ids == 0 then
+		return
 	end
 	table.sort(ids, function(a, b)
 		return Config.Supplies[a].order < Config.Supplies[b].order
 	end)
-	local grid = UIKit.grid(1, body, Vector2.new(124, 140))
+	local grid = UIKit.grid(3, body, Vector2.new(124, 140))
 	for i, id in ids do
 		local def = Config.Supplies[id]
 		local owned = if data.supplies then data.supplies[id] or 0 else 0
@@ -103,49 +115,11 @@ local function renderSupplies(body: ScrollingFrame, data: { [string]: any })
 			order = i,
 		}).Parent = grid
 	end
-	UIKit.button("Buy more supplies", function()
-		BackpackPanel.open("Shop", "supplies")
-	end, { LayoutOrder = 2, Size = UDim2.fromOffset(220, 44), BackgroundColor3 = Theme.Colors.Primary }).Parent = body
-end
-
-local function renderHarvest(body: ScrollingFrame, data: { [string]: any })
-	local produce = data.produce or {}
-	if #produce == 0 then
-		empty(body, "Your basket is empty. Harvest ripe veggies from your garden!", "Open Basket", "Market")
-		return
-	end
-	local sell = UIKit.button("Sell", function()
-		BackpackPanel.open("Market")
-	end, { BackgroundColor3 = Theme.Colors.Accent })
-	local header = UIKit.row(
-		string.format("Basket %d/%d", #produce, Config.Economy.maxProduceInventory),
-		"Sell veggies or enter them in a fair",
-		{ sell }
-	)
-	header.LayoutOrder = 1
-	header.Parent = body
-	local items = table.clone(produce)
-	table.sort(items, function(a, b)
-		return a.weight > b.weight
-	end)
-	local grid = UIKit.grid(2, body, Vector2.new(124, 140))
-	for i = 1, math.min(#items, MAX_HARVEST) do
-		local item = items[i]
-		local crop = Config.Crops[item.cropId]
-		UIKit.itemCard({
-			name = if crop then crop.displayName else item.cropId,
-			icon = cropIcon(item.cropId),
-			sub = Format.weight(item.weight) .. (if item.isGiant then " · GIANT" else ""),
-			order = i,
-		}).Parent = grid
-	end
 end
 
 function BackpackPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: string?)
 	if tab == "supplies" then
 		renderSupplies(body, data)
-	elseif tab == "harvest" then
-		renderHarvest(body, data)
 	else
 		renderSeeds(body, data)
 	end

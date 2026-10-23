@@ -56,6 +56,7 @@ Theme.PanelAccent = {
 	Ribbons = Theme.Colors.Info,
 	Backpack = Theme.Colors.Info,
 	Tools = Theme.Colors.Info,
+	Upgrades = Theme.Colors.Purple,
 	Settings = Theme.Colors.Gold,
 }
 
