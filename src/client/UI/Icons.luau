@@ -134,7 +134,7 @@ local IMAGES: { [string]: string } = {
 	Crate = "rbxassetid://71398394030588",
 	Cash = "rbxassetid://135059430542618",
 	Gems = "rbxassetid://121449516132218", -- Peter's art
-	Coins = "rbxassetid://97357776897727",
+	Coins = "rbxassetid://127516979601580", -- Peter's art
 	Leaves = "rbxassetid://108052201030190",
 	Shop = "rbxassetid://119819984937638",
 	Seeds = "rbxassetid://111591482395541",
@@ -182,7 +182,7 @@ end
 
 -- ArtSlot slot name -> icon name. Seeds, upgrades and supplies map by id below.
 Icons.Slots = {
-	CoinIcon = "Coins", -- the "Cash" image looked badly cut out on the coin pill
+	CoinIcon = "Coins",
 	LevelIcon = "Star",
 	GemIcon = "Gems",
 	MenuShop = "Shop",
