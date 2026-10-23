@@ -86,7 +86,6 @@ local seedSlots: {
 		key: TextLabel,
 		count: TextLabel,
 		edge: UIStroke,
-		shadow: Frame?,
 		selected: boolean,
 	},
 } =
@@ -353,7 +352,7 @@ local function cornerBadge(button: TextButton): Frame
 	return badge
 end
 
--- Wide side button: colour + lip + outline (UIKit.actionButton), a big icon hanging
+-- Wide side button: colour + outline (UIKit.actionButton), a big icon hanging
 -- off the left edge and the name in bold outlined text.
 local function sideButton(entry: NavEntry, onMenu: (panel: string, tab: string?) -> ()): Frame
 	local size = Theme.Size.SideButton
@@ -485,9 +484,6 @@ local function layoutForDevice()
 	for _, slot in seedSlots do
 		slot.holder.Size = UDim2.fromOffset(slotSize, slotSize + Theme.Size.SlotHeadroom + 4)
 		slot.button.Size = UDim2.fromOffset(slotSize, slotSize)
-		if slot.shadow then
-			slot.shadow.Size = slot.button.Size
-		end
 	end
 	-- Keep the hotbar clear of the stats in the corner and, on touch screens, the thumbstick and jump button.
 	local rootWidth = root.AbsoluteSize.X / math.max(Scale.value, 0.01)
@@ -572,7 +568,6 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 		Parent = holder,
 	})
 	local edge = button:FindFirstChild("Edge") :: UIStroke
-	local shadow = UIKit.shadow(button)
 	local icon = ArtSlot.icon("Seed_" .. crop.id, {
 		round = true,
 		color = rgb(crop.placeholderColor),
@@ -591,7 +586,6 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 		key = UIKit.slotKey(button, ""),
 		count = UIKit.slotCount(button),
 		edge = edge,
-		shadow = shadow,
 		selected = false,
 	}
 end
