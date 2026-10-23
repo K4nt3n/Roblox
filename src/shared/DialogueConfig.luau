@@ -15,7 +15,7 @@
 
 	ACTIONS (handled in Client.Controllers.DialogueController):
 	  "OpenShop"      open the Seed Shop panel
-	  "OpenMarket"    open the Basket panel to sell veggies
+	  "OpenMarket"    open the Sell panel to sell veggies
 	  "StartWeighIn"  pick a veggie from your basket and enter it in a fair
 	  "Close"         just close the dialogue
 ]]
@@ -48,7 +48,7 @@ DialogueConfig.Npcs = {
 		},
 	},
 	MarketMerchant = {
-		displayName = "Market Merchant",
+		displayName = "Selling Merchant",
 		stand = "Market",
 		promptText = "Talk",
 		line = "do you want to sell your vegetables boy?",

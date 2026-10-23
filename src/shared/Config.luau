@@ -447,9 +447,6 @@ Config.World = {
 	plotSize = 8,
 	plotGap = 3,
 	promptDistance = 10,
-	-- New arrivals pick a free garden slot (walk up + E, or "Pick for me"). After this
-	-- many seconds without a choice the server picks one for them.
-	autoPickSeconds = 45,
 	-- Placeholder palette (soft, saturated, kid friendly). Art replaces these later.
 	colors = {
 		soil = { 120, 85, 60 },
@@ -461,7 +458,7 @@ Config.World = {
 	-- Interaction stands. `panel` is the client UI panel the prompt opens.
 	stands = {
 		{ name = "SeedShop", panel = "Shop", label = "Seed Shop", position = { -30, 0, -30 } },
-		{ name = "Market", panel = "Market", label = "Market", position = { 0, 0, -30 } },
+		{ name = "Market", panel = "Market", label = "Sell", position = { 0, 0, -30 } },
 		{ name = "FairStand", panel = "Fair", label = "Weigh-In Fair", position = { 30, 0, -30 } },
 	},
 }

@@ -3,17 +3,19 @@
 	Hud: the always-on screen. Built once, then updated in place (no
 	rebuilds, so nothing jumps or loses its hover state).
 
-	  Top left     coin pill (rolls up, coins fly into it on a sale; + opens the Basket)
+	  Top left     coin pill (rolls up, coins fly into it on a sale)
 	               gem pill (premium currency: not in the game yet, shown as "Soon")
 	               player card (avatar, name, level badge + XP bar filled by essence via LevelBar)
-	  Left         round nav buttons: Shop, Seeds, Tools, Backpack, Upgrades, Settings
-	  Right        menu buttons with badges (basket count, champion needs care,
-	               fair waiting for an entry, new ribbons)
+	  Top center   travel buttons: My Garden (your plot) and Shops (Seed Shop, Sell, Fair)
+	  Left         nav buttons: Backpack (seeds, supplies + tools), Upgrades, Settings
+	  Right        menu buttons with badges (champion needs care, fair waiting for
+	               an entry, new ribbons)
+	Seeds and supplies are bought and veggies sold at the stands in the middle, not from the HUD.
 	  Bottom       seed hotbar (selected seed lifts up)
-	  Top center   toasts (own ScreenGui above panels and modals)
+	  Top center   toasts, under the travel buttons (own ScreenGui above panels and modals)
 
 	Fly-to targets for effects (harvest -> basket in G4, coins, essence):
-	    Hud.target("Coins" | "Level" | "Market" | "Shop" | "Fair" | "Champion" | "Ribbons" | "Seeds")
+	    Hud.target("Coins" | "Level" | "Backpack" | "Upgrades" | "Fair" | "Champion" | "Ribbons" | "Seeds")
 
 	Art slots: CoinIcon, LevelIcon, Menu<Panel>, Seed_<cropId> (see Theme.Art).
 ]]
@@ -36,6 +38,7 @@ local EssenceFX = require(script.Parent.Parent.Feel.EssenceFX)
 
 local Icons = require(script.Parent.Icons)
 local ToolBar = require(script.Parent.ToolBar)
+local Teleport = require(script.Parent.Parent.Controllers.Teleport)
 
 local Hud = {}
 
@@ -44,17 +47,19 @@ export type NavEntry = { id: string, panel: string, tab: string?, text: string, 
 
 -- Left nav (round buttons). `tab` opens that tab of the panel.
 Hud.NAV = {
-	{ id = "Shop", panel = "Shop", text = "Shop", icon = "Shop", color = Theme.Colors.Danger },
-	{ id = "Seeds", panel = "Shop", tab = "seeds", text = "Seeds", icon = "Seeds", color = Theme.Colors.Primary },
-	{ id = "Tools", panel = "Tools", text = "Tools", icon = "Tools", color = Theme.Colors.Info },
 	{ id = "Backpack", panel = "Backpack", text = "Backpack", icon = "Backpack", color = Theme.Colors.Slate },
-	{ id = "Upgrades", panel = "Shop", tab = "upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
+	{ id = "Upgrades", panel = "Upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
 	{ id = "Settings", panel = "Settings", text = "Settings", icon = "Settings", color = Theme.Colors.Gold },
 } :: { NavEntry }
 
+-- Top travel buttons.
+Hud.TRAVEL = {
+	{ id = "Garden", text = "My Garden", icon = "Home", color = Theme.Colors.Primary, go = Teleport.toGarden },
+	{ id = "Shops", text = "Shops", icon = "Shop", color = Theme.Colors.Danger, go = Teleport.toShops },
+}
+
 -- Right menu.
 Hud.MENU = {
-	{ panel = "Market", text = "Basket", icon = "Basket", color = Theme.Colors.Accent },
 	{ panel = "Fair", text = "Fairs", icon = "Trophy", color = Theme.Colors.Gold },
 	{ panel = "Champion", text = "Champion", icon = "Crown", color = Theme.Colors.Purple },
 	{ panel = "Ribbons", text = "Ribbons", icon = "Ribbon", color = Theme.Colors.Danger },
@@ -66,6 +71,7 @@ local coinCounter: Counter.Counter
 local levelPill: Frame
 local gemPill: Frame
 local nav: Frame
+local travel: Frame
 local navButtons: { [string]: TextButton } = {}
 local menu: Frame
 local seedScroller: ScrollingFrame
@@ -79,7 +85,6 @@ local coinPending: number? = nil
 -- True while a garden tool is in hand: the seed highlight dims so only one thing is active.
 local toolActive = false
 local lastData: { [string]: any }? = nil
-local onEarnCoins: () -> () = function() end
 local dockHidden = false
 
 local function cropOrder(): { any }
@@ -153,24 +158,6 @@ local function buildStats()
 		gainColor = Theme.Colors.Gold,
 		tick = "CoinTick",
 	})
-	-- "+": earn coins by selling veggies (opens the Basket).
-	local earn = UIKit.button("+", function()
-		onEarnCoins()
-	end, {
-		Name = "Earn",
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -4, 0.5, 0),
-		Size = UDim2.fromOffset(34, 34),
-		BackgroundColor3 = Theme.Colors.PrimaryDark,
-		TextSize = Theme.TextSize.Large,
-		ZIndex = 4,
-		Parent = coinPill,
-	})
-	local earnCorner = earn:FindFirstChildOfClass("UICorner")
-	if earnCorner then
-		earnCorner.CornerRadius = UDim.new(0, 9)
-	end
-
 	-- Gems: premium currency. Not in the game yet, so the pill says "Soon" and has no + button.
 	gemPill = UIKit.new("Frame", {
 		Name = "Gems",
@@ -302,9 +289,10 @@ end
 
 -- Reference-style rectangle buttons: colour + icon square + bold outlined text.
 local navHolders: { Frame } = {}
+local travelHolders: { Frame } = {}
 local menuHolders: { Frame } = {}
 
--- Left nav (Shop, Seeds, Tools, Backpack, Upgrades, Settings).
+-- Left nav (Backpack, Upgrades, Settings).
 local function buildNav(onMenu: (panel: string, tab: string?) -> ())
 	nav = UIKit.new("Frame", {
 		Name = "Nav",
@@ -324,11 +312,30 @@ local function buildNav(onMenu: (panel: string, tab: string?) -> ())
 		navButtons[entry.id] = button
 		table.insert(navHolders, holder)
 	end
-	-- Badges that target "Shop" land on the nav Shop button (effects via Hud.target).
-	menuBadges.Shop = UIKit.badge(navButtons.Shop)
 end
 
--- Right menu (Basket, Fairs, Champion, Ribbons) in the same style, with badges.
+-- Top center: teleport to your own garden, or to the stands in the middle.
+local function buildTravel()
+	travel = UIKit.new("Frame", {
+		Name = "Travel",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 14),
+		Size = UDim2.fromOffset(0, 0),
+		AutomaticSize = Enum.AutomaticSize.XY,
+		Parent = root,
+	}, { UIKit.list(Enum.FillDirection.Horizontal, 10, Enum.HorizontalAlignment.Center) })
+	for i, entry in Hud.TRAVEL do
+		local holder, button = UIKit.actionButton(entry.text, entry.icon, entry.color, entry.go)
+		holder.Name = entry.id
+		holder.LayoutOrder = i
+		holder.Parent = travel
+		navButtons[entry.id] = button
+		table.insert(travelHolders, holder)
+	end
+end
+
+-- Right menu (Fairs, Champion, Ribbons) in the same style, with badges.
 local function buildMenu(onMenu: (panel: string) -> ())
 	menu = UIKit.new("Frame", {
 		Name = "Menu",
@@ -388,6 +395,9 @@ local function layoutForDevice()
 		UIKit.setActionSize(holder, buttonSize, textSize)
 	end
 	for _, holder in menuHolders do
+		UIKit.setActionSize(holder, buttonSize, textSize)
+	end
+	for _, holder in travelHolders do
 		UIKit.setActionSize(holder, buttonSize, textSize)
 	end
 	nav.Size = UDim2.fromOffset(buttonSize.X, 0)
@@ -512,9 +522,6 @@ end
 ---------------------------------------------------------------------------
 
 function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) -> (), onSeed: (cropId: string) -> ())
-	onEarnCoins = function()
-		onMenu("Market")
-	end
 	local gui = UIKit.new("ScreenGui", {
 		Name = "GVF_UI",
 		ResetOnSpawn = false,
@@ -535,6 +542,7 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 
 	buildStats()
 	buildNav(onMenu)
+	buildTravel()
 	buildMenu(onMenu)
 	buildSeedDock()
 	-- Picking a seed puts any garden tool away.
@@ -563,7 +571,6 @@ function Hud.render(data: { [string]: any })
 	Hud.setCoins(data.coins)
 	LevelBar.setTarget(data.level, data.xp, data.xpToNext or 1)
 	renderSeeds(data)
-	UIKit.setBadge(menuBadges.Market, #(data.produce or {}))
 end
 
 -- Coins from the server. Held back while coins are still flying in.
