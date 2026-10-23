@@ -24,6 +24,7 @@
 ]]
 
 local Players = game:GetService("Players")
+local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -77,8 +78,25 @@ local settingsHolder: Frame
 local seedScroller: ScrollingFrame
 local seedDock: Frame
 local menuBadges: { [string]: Frame } = {}
-local seedSlots: { [string]: { holder: Frame, button: TextButton, count: TextLabel, edge: UIStroke, shadow: Frame?, selected: boolean } } =
+local seedSlots: {
+	[string]: {
+		name: string,
+		holder: Frame,
+		button: TextButton,
+		key: TextLabel,
+		count: TextLabel,
+		edge: UIStroke,
+		shadow: Frame?,
+		selected: boolean,
+	},
+} =
 	{}
+-- Keybind -> crop id for the seed slots on screen (tools use 1-3, seeds 4-9 and 0).
+local seedKeys: { [number]: string } = {}
+local heldName: TextLabel
+local heldToken = 0
+-- No name pop-up for the seed that is already selected when you join.
+local seedsRendered = false
 
 local coinPending: number? = nil
 -- True while a garden tool is in hand: the seed highlight dims so only one thing is active.
@@ -481,6 +499,35 @@ end
 -- Seed hotbar (keyed, updated in place)
 ---------------------------------------------------------------------------
 
+-- Seeds take the number keys after the garden tools.
+local FIRST_SEED_KEY = 4
+local SEED_KEYCODES = {
+	Enum.KeyCode.Four,
+	Enum.KeyCode.Five,
+	Enum.KeyCode.Six,
+	Enum.KeyCode.Seven,
+	Enum.KeyCode.Eight,
+	Enum.KeyCode.Nine,
+	Enum.KeyCode.Zero,
+}
+
+-- The name of what you just picked, shown above the hotbar for a moment.
+local function showHeld(name: string)
+	if not heldName then
+		return
+	end
+	heldToken += 1
+	local token = heldToken
+	heldName.Text = name
+	heldName.TextTransparency = 0
+	Tweens.pop(heldName, 0.1)
+	task.delay(1.5, function()
+		if token == heldToken then
+			Tweens.play(heldName, Tweens.Ease.Fade, { TextTransparency = 1 })
+		end
+	end)
+end
+
 local function setSlotSelected(cropId: string, selected: boolean)
 	local slot = seedSlots[cropId]
 	if not slot or slot.selected == selected then
@@ -498,6 +545,9 @@ local function setSlotSelected(cropId: string, selected: boolean)
 	if selected then
 		Tweens.pop(slot.button, 0.12)
 		Tweens.flash(slot.button, Theme.Style.Flash, 0.3)
+		if seedsRendered then
+			showHeld(slot.name)
+		end
 	end
 end
 
@@ -534,19 +584,12 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 	-- Big and centred, and it grows and shrinks with the slot (phone sizes).
 	icon.Size = UDim2.fromScale(ICON_SCALE, ICON_SCALE)
 	icon.Parent = button
-	UIKit.label(crop.displayName, 13, {
-		Name = "Name",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -4),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		ZIndex = 4, -- over the icon
-		Parent = button,
-	})
-	local countBadge = UIKit.badge(button, Theme.Colors.PrimaryDark)
 	seedSlots[crop.id] = {
+		name = crop.displayName,
 		holder = holder,
 		button = button,
-		count = countBadge:FindFirstChild("Count") :: TextLabel,
+		key = UIKit.slotKey(button, ""),
+		count = UIKit.slotCount(button),
 		edge = edge,
 		shadow = shadow,
 		selected = false,
@@ -554,6 +597,8 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 end
 
 local function renderSeeds(data: { [string]: any })
+	table.clear(seedKeys)
+	local nextKey = FIRST_SEED_KEY
 	for _, crop in cropOrder() do
 		local slot = seedSlots[crop.id]
 		if not slot then
@@ -567,14 +612,21 @@ local function renderSeeds(data: { [string]: any })
 		elseif not visible and slot.holder.Visible then
 			slot.holder.Visible = false
 		end
-		local badge = slot.count.Parent :: Frame
-		if crop.seedCost == 0 then
-			UIKit.setBadge(badge, false)
+		-- Keybinds follow the slots on screen, left to right.
+		if visible and nextKey - FIRST_SEED_KEY < #SEED_KEYCODES then
+			seedKeys[nextKey] = crop.id
+			slot.key.Text = tostring(nextKey % 10)
+			slot.key.Visible = true
+			nextKey += 1
 		else
-			UIKit.setBadge(badge, count)
+			slot.key.Visible = false
 		end
+		-- Free seeds never run out, so they show no count.
+		slot.count.Visible = crop.seedCost ~= 0
+		slot.count.Text = tostring(count)
 		setSlotSelected(crop.id, data.selectedSeed == crop.id and not toolActive)
 	end
+	seedsRendered = true
 end
 
 ---------------------------------------------------------------------------
@@ -620,8 +672,32 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 		makeSeedSlot(crop, i, selectSeed)
 	end
 	ToolBar.mount(seedScroller)
+	heldName = UIKit.label("", Theme.TextSize.Large, {
+		Name = "HeldName",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		TextTransparency = 1,
+		Parent = seedDock,
+	})
+	UIKit.outlineText(heldName, Theme.Style.TitleOutline, true)
+	ContextActionService:BindAction("GVF_SeedKeys", function(_, state, input)
+		if state ~= Enum.UserInputState.Begin then
+			return Enum.ContextActionResult.Pass
+		end
+		local index = table.find(SEED_KEYCODES, input.KeyCode)
+		local cropId = index and seedKeys[FIRST_SEED_KEY + index - 1]
+		if cropId then
+			selectSeed(cropId)
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, table.unpack(SEED_KEYCODES))
 	ToolBar.Changed:Connect(function(toolId)
 		toolActive = toolId ~= nil
+		if toolId then
+			showHeld(ToolBar.displayName(toolId))
+		end
 		if lastData then
 			renderSeeds(lastData)
 		end

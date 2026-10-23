@@ -37,7 +37,7 @@ local SHORT_NAME: { [string]: string } = {
 }
 local KEYS = { Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three }
 
-type Slot = { holder: Frame, button: TextButton, edge: UIStroke, badge: Frame?, equipped: boolean }
+type Slot = { holder: Frame, button: TextButton, edge: UIStroke, count: TextLabel?, equipped: boolean }
 
 local localPlayer = Players.LocalPlayer
 local slots: { [string]: Slot } = {}
@@ -98,6 +98,12 @@ local function refresh()
 		equippedId = now
 		ToolBar.Changed:Fire(now)
 	end
+end
+
+-- Short name shown when the tool is picked.
+function ToolBar.displayName(toolId: string): string
+	local def = Config.Tools.items[toolId]
+	return SHORT_NAME[toolId] or (def and def.displayName) or toolId
 end
 
 function ToolBar.equipped(): string?
@@ -165,30 +171,12 @@ local function makeSlot(parent: Instance, toolId: string, index: number)
 	-- Big and centred, and it grows and shrinks with the slot (phone sizes).
 	icon.Size = UDim2.fromScale(ICON_SCALE, ICON_SCALE)
 	icon.Parent = button
-	local key = UIKit.label(tostring(index), 13, {
-		Name = "Key",
-		Position = UDim2.fromOffset(6, 3),
-		TextColor3 = Theme.Colors.TextOnPrimary,
-		ZIndex = 4,
-		Parent = button,
-	})
-	UIKit.outlineText(key, 2)
-	local name = UIKit.label(SHORT_NAME[toolId] or toolId, 12, {
-		Name = "Name",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -4),
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextColor3 = Theme.Colors.TextOnPrimary,
-		ZIndex = 4, -- over the icon
-		Parent = button,
-	})
-	UIKit.outlineText(name, 2)
-	local badge = if def and def.supply then UIKit.badge(button, Theme.Colors.PrimaryDark) else nil
+	UIKit.slotKey(button, tostring(index))
 	slots[toolId] = {
 		holder = holder,
 		button = button,
 		edge = button:FindFirstChild("Edge") :: UIStroke,
-		badge = badge,
+		count = if def and def.supply then UIKit.slotCount(button) else nil,
 		equipped = false,
 	}
 end
@@ -252,14 +240,13 @@ end
 function ToolBar.render(data: { [string]: any })
 	for toolId, slot in slots do
 		local def = Config.Tools.items[toolId]
-		if slot.badge and def and def.supply then
+		local count = slot.count
+		if count and def and def.supply then
 			local bags = if data.supplies then data.supplies[def.supply] or 0 else 0
-			-- Show 0 too, so players see they are out.
-			UIKit.setBadge(slot.badge, if bags > 0 then bags else true)
-			local count = slot.badge:FindFirstChild("Count") :: TextLabel?
-			if count and bags == 0 then
-				count.Text = "0"
-			end
+			-- Show 0 too (in red), so players see they are out.
+			count.Text = tostring(bags)
+			count.TextColor3 = if bags > 0 then Theme.Colors.TextOnPrimary else Theme.Colors.Danger
+			count.Visible = true
 		end
 	end
 end
