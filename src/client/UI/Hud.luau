@@ -93,6 +93,8 @@ local SIDE_ICON_SCALE = 1.3
 local TOP_GAP = 4
 local STATS_WIDTH = Theme.Size.PillWidth + 20
 local STATS_HEIGHT = 172
+-- Share of a hotbar slot the seed icon fills.
+local ICON_SCALE = 0.72
 
 local function cropOrder(): { any }
 	local list = {}
@@ -521,22 +523,23 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 	})
 	local edge = button:FindFirstChild("Edge") :: UIStroke
 	local shadow = UIKit.shadow(button)
-	ArtSlot.icon("Seed_" .. crop.id, {
-		size = 40,
+	local icon = ArtSlot.icon("Seed_" .. crop.id, {
 		round = true,
 		color = rgb(crop.placeholderColor),
 		glyph = string.sub(crop.displayName, 1, 1),
-		anchor = Vector2.new(0.5, 0),
-		position = UDim2.new(0.5, 0, 0, 8),
+		anchor = Vector2.new(0.5, 0.5),
+		position = UDim2.fromScale(0.5, 0.5),
 		zIndex = 3,
-	}).Parent =
-		button
+	})
+	-- Big and centred, and it grows and shrinks with the slot (phone sizes).
+	icon.Size = UDim2.fromScale(ICON_SCALE, ICON_SCALE)
+	icon.Parent = button
 	UIKit.label(crop.displayName, 13, {
 		Name = "Name",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -5),
 		TextXAlignment = Enum.TextXAlignment.Center,
-		ZIndex = 3,
+		ZIndex = 4, -- over the icon
 		Parent = button,
 	})
 	local countBadge = UIKit.badge(button, Theme.Colors.PrimaryDark)
