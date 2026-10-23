@@ -313,8 +313,9 @@ local function iconButton(entry: NavEntry, onMenu: (panel: string, tab: string?)
 	if entry.text then
 		local label = UIKit.label(entry.text, Theme.TextSize.Small, {
 			Name = "Caption",
-			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 1, 1),
+			-- The grid cell (= holder) is button + lip + caption tall, so the caption sits at its bottom.
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, 0),
 			Size = UDim2.new(1, NAV_GAP, 0, NAV_LABEL),
 			AutomaticSize = Enum.AutomaticSize.None,
 			TextXAlignment = Enum.TextXAlignment.Center,
@@ -362,7 +363,7 @@ end
 local function buildSettings(onMenu: (panel: string, tab: string?) -> ())
 	settingsHolder = iconButton(Hud.SETTINGS, onMenu)
 	settingsHolder.AnchorPoint = Vector2.new(1, 0)
-	settingsHolder.Position = UDim2.new(1, -16, 0, TOP_GAP)
+	settingsHolder.Position = UDim2.new(1, -TOP_GAP, 0, TOP_GAP)
 	settingsHolder.Parent = root
 end
 

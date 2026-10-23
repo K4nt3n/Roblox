@@ -605,7 +605,9 @@ function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 		Name = "Badge",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(1, -6, 0, 6),
-		Size = UDim2.fromOffset(24, 24),
+		-- Width grows with the text from 0 (the size constraint keeps it at least a 24px circle);
+		-- a 24px base width here would be added to the text and make "!" a wide pill.
+		Size = UDim2.fromOffset(0, 24),
 		AutomaticSize = Enum.AutomaticSize.X,
 		BackgroundColor3 = color or Theme.Colors.Danger,
 		BorderSizePixel = 0,
@@ -617,6 +619,11 @@ function UIKit.badge(parent: GuiObject, color: Color3?): Frame
 		UIKit.stroke(Theme.Style.Outline, 2.5),
 		UIKit.new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
 		UIKit.new("UISizeConstraint", { MinSize = Vector2.new(24, 24) }),
+		UIKit.new("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+		}),
 	})
 	UIKit.label("", Theme.TextSize.Small, {
 		Name = "Count",
