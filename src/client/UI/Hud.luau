@@ -93,6 +93,7 @@ local seedSlots: {
 -- Keybind -> crop id for the seed slots on screen (tools use 1-3, seeds 4-9 and 0).
 local seedKeys: { [number]: string } = {}
 local heldName: TextLabel
+local heldOutline: UIStroke
 local heldToken = 0
 -- No name pop-up for the seed that is already selected when you join.
 local seedsRendered = false
@@ -507,6 +508,22 @@ local SEED_KEYCODES = {
 	Enum.KeyCode.Zero,
 }
 
+-- The outline does not follow TextTransparency, so it fades on its own; otherwise
+-- a dark outline-only copy of the name stays behind.
+local function hideHeld(instant: boolean)
+	if not heldName then
+		return
+	end
+	heldToken += 1
+	if instant then
+		heldName.TextTransparency = 1
+		heldOutline.Transparency = 1
+	else
+		Tweens.play(heldName, Tweens.Ease.Fade, { TextTransparency = 1 })
+		Tweens.play(heldOutline, Tweens.Ease.Fade, { Transparency = 1 })
+	end
+end
+
 -- The name of what you just picked, shown above the hotbar for a moment.
 local function showHeld(name: string)
 	if not heldName then
@@ -516,10 +533,11 @@ local function showHeld(name: string)
 	local token = heldToken
 	heldName.Text = name
 	heldName.TextTransparency = 0
+	heldOutline.Transparency = 0
 	Tweens.pop(heldName, 0.1)
 	task.delay(1.5, function()
 		if token == heldToken then
-			Tweens.play(heldName, Tweens.Ease.Fade, { TextTransparency = 1 })
+			hideHeld(false)
 		end
 	end)
 end
@@ -675,7 +693,8 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 		TextTransparency = 1,
 		Parent = seedDock,
 	})
-	UIKit.outlineText(heldName, 2, true)
+	heldOutline = UIKit.outlineText(heldName, 2, true)
+	heldOutline.Transparency = 1
 	ContextActionService:BindAction("GVF_SeedKeys", function(_, state, input)
 		if state ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass
@@ -781,6 +800,9 @@ function Hud.setDockHidden(hidden: boolean)
 		return
 	end
 	dockHidden = hidden
+	if hidden then
+		hideHeld(true)
+	end
 	Tweens.play(seedDock, if hidden then Tweens.Ease.PanelOut else Tweens.Ease.PanelIn, {
 		Position = UDim2.new(0.5, 0, 1, if hidden then 140 else -10),
 	})
