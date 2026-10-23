@@ -466,6 +466,24 @@ Config.World = {
 	},
 }
 
+-- Studded look for the island map (server/Map/Studs). The island itself is hand-built in
+-- Workspace.Map; MapService only restyles it at runtime, nothing is moved or saved.
+Config.Map = {
+	studs = true,
+	-- Folders in Workspace that get studs at server start. Gardens get them as PlotService builds them.
+	folders = { "Map", "Stands", "FairStage" },
+	-- Turn Wood, SmoothPlastic etc. into Plastic so every part has the toy-brick look.
+	-- Neon, Glass and ForceField are kept.
+	plastic = true,
+	-- Make colours a bit brighter and more saturated (1 = unchanged).
+	saturation = 1.25,
+	brightness = 1.05,
+	-- Optional: an uploaded stud tile image (e.g. "rbxassetid://123"). Needed for studs on
+	-- cylinders (the round plaza and spawn); blocks and wedges use the built-in Studs surface.
+	studTexture = "",
+	studTextureTile = 2, -- studs per tile of studTexture
+}
+
 Config.Net = {
 	-- Max requests per action per player inside the window.
 	rateLimit = { window = 2, maxCalls = 8 },
