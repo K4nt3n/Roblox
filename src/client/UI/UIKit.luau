@@ -136,7 +136,7 @@ end
 
 -- The stroke also grows into the holes of letters (e, o, a, d, p). Below this share of the
 -- text height a thin stroke leaves a light dot inside them, so big text gets a thicker one.
-local HOLE_FILL = 0.12
+local HOLE_FILL = 0.17
 
 -- Dark outline around text. Only shown when the text is light, so dark text stays clean,
 -- unless `always` (bright coloured text, like the fair timers).
