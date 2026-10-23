@@ -24,6 +24,11 @@ function Schema.default(config: any): { [string]: any }
 	for id in config.Upgrades do
 		upgrades[id] = 0
 	end
+	-- Every garden tool starts on the hotbar; Backpack > Supplies takes them off.
+	local hotbar = {}
+	for id in config.Tools.items do
+		hotbar[id] = true
+	end
 	return {
 		version = Schema.Version,
 		coins = config.Economy.startingCoins,
@@ -34,7 +39,10 @@ function Schema.default(config: any): { [string]: any }
 		plots = {},
 		-- cropId -> count
 		seeds = seeds,
-		selectedSeed = "carrot",
+		-- "" = nothing in hand. Cleared on every join, like a normal hotbar.
+		selectedSeed = "",
+		-- toolId -> whether it sits on the hotbar
+		hotbar = hotbar,
 		-- supplyId -> count (consumables like fertilizer bags)
 		supplies = supplies,
 		-- array of { uid, cropId, weight, isGiant, harvestedAt }

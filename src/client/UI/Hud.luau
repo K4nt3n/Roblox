@@ -90,8 +90,10 @@ local seedSlots: {
 	},
 } =
 	{}
--- Keybind -> crop id for the seed slots on screen (tools use 1-3, seeds 4-9 and 0).
-local seedKeys: { [number]: string } = {}
+-- Number key (1-9, 0 = 10) -> what it picks. Every slot on the hotbar, tools then
+-- seeds, gets the next number, so taking one off moves the rest down.
+local hotkeys: { [number]: () -> () } = {}
+local pickSeed: (cropId: string) -> () = function() end
 local heldName: TextLabel
 local heldOutline: UIStroke
 local heldToken = 0
@@ -496,9 +498,10 @@ end
 -- Seed hotbar (keyed, updated in place)
 ---------------------------------------------------------------------------
 
--- Seeds take the number keys after the garden tools.
-local FIRST_SEED_KEY = 4
-local SEED_KEYCODES = {
+local HOTKEYS = {
+	Enum.KeyCode.One,
+	Enum.KeyCode.Two,
+	Enum.KeyCode.Three,
 	Enum.KeyCode.Four,
 	Enum.KeyCode.Five,
 	Enum.KeyCode.Six,
@@ -609,8 +612,19 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 end
 
 local function renderSeeds(data: { [string]: any })
-	table.clear(seedKeys)
-	local nextKey = FIRST_SEED_KEY
+	table.clear(hotkeys)
+	local nextKey = 1
+	for _, toolId in ToolBar.visibleTools() do
+		if nextKey <= #HOTKEYS then
+			hotkeys[nextKey] = function()
+				ToolBar.toggle(toolId)
+			end
+			ToolBar.setKey(toolId, tostring(nextKey % 10))
+			nextKey += 1
+		else
+			ToolBar.setKey(toolId, nil)
+		end
+	end
 	for _, crop in cropOrder() do
 		local slot = seedSlots[crop.id]
 		if not slot then
@@ -625,8 +639,11 @@ local function renderSeeds(data: { [string]: any })
 			slot.holder.Visible = false
 		end
 		-- Keybinds follow the slots on screen, left to right.
-		if visible and nextKey - FIRST_SEED_KEY < #SEED_KEYCODES then
-			seedKeys[nextKey] = crop.id
+		if visible and nextKey <= #HOTKEYS then
+			local cropId = crop.id
+			hotkeys[nextKey] = function()
+				pickSeed(cropId)
+			end
 			slot.key.Text = tostring(nextKey % 10)
 			slot.key.Visible = true
 			nextKey += 1
@@ -675,13 +692,24 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 	FairTimers.mount(root, function(fair)
 		onMenu("Fair", fair)
 	end)
-	-- Picking a seed puts any garden tool away.
-	local function selectSeed(cropId: string)
-		ToolBar.unequip()
+	-- Shows the change right away; the server's snapshot follows.
+	local function setSeed(cropId: string)
 		onSeed(cropId)
+		if lastData then
+			lastData.selectedSeed = cropId
+			renderSeeds(lastData)
+		end
+	end
+	-- Picking a seed puts any garden tool away; picking the seed in hand puts it away.
+	pickSeed = function(cropId: string)
+		local inHand = lastData and lastData.selectedSeed == cropId and not toolActive
+		ToolBar.unequip()
+		setSeed(if inHand then "" else cropId)
 	end
 	for i, crop in cropOrder() do
-		makeSeedSlot(crop, i, selectSeed)
+		makeSeedSlot(crop, i, function(cropId)
+			pickSeed(cropId)
+		end)
 	end
 	ToolBar.mount(seedScroller)
 	heldName = UIKit.label("", Theme.TextSize.Large, {
@@ -695,21 +723,26 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 	})
 	heldOutline = UIKit.outlineText(heldName, 2, true)
 	heldOutline.Transparency = 1
-	ContextActionService:BindAction("GVF_SeedKeys", function(_, state, input)
+	ContextActionService:BindAction("GVF_HotbarKeys", function(_, state, input)
 		if state ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass
 		end
-		local index = table.find(SEED_KEYCODES, input.KeyCode)
-		local cropId = index and seedKeys[FIRST_SEED_KEY + index - 1]
-		if cropId then
-			selectSeed(cropId)
+		local index = table.find(HOTKEYS, input.KeyCode)
+		local pick = index and hotkeys[index]
+		if pick then
+			pick()
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, table.unpack(SEED_KEYCODES))
+	end, false, table.unpack(HOTKEYS))
 	ToolBar.Changed:Connect(function(toolId)
 		toolActive = toolId ~= nil
 		if toolId then
 			showHeld(ToolBar.displayName(toolId))
+			-- Taking out a tool puts the seed away.
+			if lastData and lastData.selectedSeed ~= "" then
+				setSeed("")
+				return
+			end
 		end
 		if lastData then
 			renderSeeds(lastData)
@@ -722,6 +755,7 @@ end
 
 function Hud.render(data: { [string]: any })
 	lastData = data
+	-- Tools first: the seed keys are numbered after the tools on the hotbar.
 	ToolBar.render(data)
 	Hud.setCoins(data.coins)
 	LevelBar.setTarget(data.level, data.xp, data.xpToNext or 1)

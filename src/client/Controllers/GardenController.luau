@@ -229,7 +229,7 @@ local function updatePrompts(view: PlotView, plant: GrowthMath.Plant?, state: Gr
 	if not plant or not state then
 		local seed = if data then Config.Crops[data.selectedSeed] else nil
 		main.ActionText = if view.isChampion then "Plant Champion" else "Plant"
-		main.ObjectText = if seed then seed.displayName else ""
+		main.ObjectText = if seed then seed.displayName else "Pick a seed first"
 		water.Enabled = false
 		return
 	end

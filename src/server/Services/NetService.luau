@@ -135,6 +135,7 @@ function NetService:PushState(player: Player, data: { [string]: any })
 			plots = data.plots,
 			seeds = data.seeds,
 			selectedSeed = data.selectedSeed,
+			hotbar = data.hotbar,
 			produce = data.produce,
 			upgrades = data.upgrades,
 			fair = data.fair,
