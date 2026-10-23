@@ -134,16 +134,12 @@ function UIKit.outline(gui: GuiObject, thickness: number?, transparency: number?
 	return stroke
 end
 
--- The stroke also grows into the holes of letters (e, o, a, d, p). Below this share of the
--- text height a thin stroke leaves a light dot inside them, so big text gets a thicker one.
-local HOLE_FILL = 0.17
-
 -- Dark outline around text. Only shown when the text is light, so dark text stays clean,
 -- unless `always` (bright coloured text, like the fair timers).
 function UIKit.outlineText(text: GuiObject, thickness: number?, always: boolean?): UIStroke
 	local existing = text:FindFirstChild("TextOutline") :: UIStroke?
 	if existing then
-		existing:SetAttribute("Base", thickness or Theme.Style.TextOutline)
+		existing.Thickness = thickness or Theme.Style.TextOutline
 		return existing
 	end
 	local stroke: UIStroke = UIKit.new("UIStroke", {
@@ -154,20 +150,10 @@ function UIKit.outlineText(text: GuiObject, thickness: number?, always: boolean?
 		Thickness = thickness or Theme.Style.TextOutline,
 		Parent = text,
 	})
-	stroke:SetAttribute("Base", thickness or Theme.Style.TextOutline)
 	local function sync()
-		local label = text :: any
-		local base = stroke:GetAttribute("Base") :: number
-		local height = if label.TextScaled
-			then label.TextBounds.Y / math.max(1, #string.split(label.Text, "\n"))
-			else label.TextSize
-		stroke.Thickness = math.max(base, height * HOLE_FILL)
-		stroke.Enabled = always == true or Theme.wantsOutline(label.TextColor3)
+		stroke.Enabled = always == true or Theme.wantsOutline((text :: any).TextColor3)
 	end
-	for _, property in { "TextColor3", "TextSize", "TextBounds" } do
-		text:GetPropertyChangedSignal(property):Connect(sync)
-	end
-	stroke:GetAttributeChangedSignal("Base"):Connect(sync)
+	text:GetPropertyChangedSignal("TextColor3"):Connect(sync)
 	sync()
 	return stroke
 end
