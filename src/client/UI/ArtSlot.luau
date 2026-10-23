@@ -32,9 +32,21 @@ export type IconOptions = {
 	zIndex: number?,
 }
 
-function ArtSlot.asset(slot: string): string?
+local function lookup(slot: string): string?
 	local id = Theme.Art[slot]
 	return if id and id ~= "" then id else nil
+end
+
+function ArtSlot.asset(slot: string): string?
+	local id = lookup(slot)
+	if not id then
+		-- Panel headers reuse the menu button art unless they have their own.
+		local panel = string.match(slot, "^PanelIcon_(.+)$")
+		if panel then
+			id = lookup("Menu" .. panel)
+		end
+	end
+	return id
 end
 
 local function corner(parent: Instance, radius: UDim)

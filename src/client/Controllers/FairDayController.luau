@@ -498,7 +498,7 @@ local function build()
 		Visible = false,
 		Parent = root,
 	}, {
-		UIKit.corner(UDim.new(0, 20)),
+		UIKit.corner(Theme.CornerPanel),
 		UIKit.stroke(Theme.Style.Outline, Theme.Style.PanelOutlineThickness),
 		UIKit.padding(14),
 		UIKit.list(Enum.FillDirection.Vertical, 6, Enum.HorizontalAlignment.Center),

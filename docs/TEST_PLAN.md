@@ -18,6 +18,12 @@ Run with **Test → Local Server, 2 players** unless noted. Automated tests for 
 - [ ] Spam a button: toasts stack as "x2", never more than 3 on screen.
 - [ ] Device emulator (iPhone landscape, iPad, 1080p): everything readable, nothing off screen, hotbar clear of the thumbstick and jump button.
 - [ ] Gamepad: opening a panel selects its first button; the gold ring moves with the D-pad; B closes.
+- [ ] Look: colored buttons, menu buttons, the coin pill and panel headers show a faint stud grid and a darker
+      bottom lip; panels and rows are white with dark edges; white text has a heavy dark stroke.
+- [ ] Studs: if no grid shows at all, check the Output for EditableImage errors (set `Theme.Art.StudTile` to an
+      uploaded tile as the fallback).
+- [ ] Fair timers under the level pill count down every second ("In 15m 57s"), turn gold in the last minute,
+      say "Judging!" when due, and tapping one opens the Fairs panel on that fair's tab.
 
 ## Plant, grow, water, harvest
 - [ ] E on an empty plot plants a carrot. A small ball appears and swells smoothly (no jumps).

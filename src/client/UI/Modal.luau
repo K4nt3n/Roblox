@@ -79,12 +79,17 @@ local function showNext()
 		BorderSizePixel = 0,
 		Parent = backdrop,
 	}, {
-		UIKit.corner(UDim.new(0, 22)),
+		UIKit.corner(Theme.CornerPanel),
 		UIKit.padding(18),
 		UIKit.list(Enum.FillDirection.Vertical, 10, Enum.HorizontalAlignment.Center),
+		-- Clean white card with just a hint of the accent at the top.
 		UIKit.new("UIGradient", {
 			Rotation = 90,
-			Color = ColorSequence.new(Theme.lighten(accent, 0.7), Theme.Colors.Background),
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Theme.lighten(accent, 0.86)),
+				ColorSequenceKeypoint.new(0.35, Theme.Colors.Background),
+				ColorSequenceKeypoint.new(1, Theme.Colors.Background),
+			}),
 		}),
 	})
 	UIKit.outline(card, Theme.Style.PanelOutlineThickness)
@@ -127,7 +132,8 @@ local function showNext()
 			TextWrapped = true,
 			AutomaticSize = Enum.AutomaticSize.Y,
 			Size = UDim2.new(1, 0, 0, 0),
-		}).Parent = card
+		}).Parent =
+			card
 	end
 
 	if spec.build then
