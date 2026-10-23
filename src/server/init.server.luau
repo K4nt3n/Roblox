@@ -12,7 +12,7 @@ local Services = script:WaitForChild("Services")
 local ORDER = {
 	"NetService",
 	"DataService",
-	"MapService", -- builds Workspace.Map in Init, before PlotService:Start checks for it
+	"MapService", -- studs on the island in Init, before anything is built on it
 	"PlotService",
 	"EconomyService",
 	"GardenService",
