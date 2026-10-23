@@ -18,10 +18,11 @@
 local Theme = {}
 
 -- Candy palette: saturated, bright, and readable under a dark outline.
+-- Panels, cards and HUD tiles are dark navy with a light border (reference UI kit).
 Theme.Colors = {
-	Background = Color3.fromRGB(255, 250, 238),
-	Surface = Color3.fromRGB(255, 255, 255),
-	SurfaceAlt = Color3.fromRGB(240, 234, 250),
+	Background = Color3.fromRGB(28, 36, 60),
+	Surface = Color3.fromRGB(42, 54, 86),
+	SurfaceAlt = Color3.fromRGB(32, 42, 70),
 	Primary = Color3.fromRGB(70, 220, 85),
 	PrimaryDark = Color3.fromRGB(30, 165, 70),
 	Accent = Color3.fromRGB(255, 140, 25),
@@ -30,12 +31,16 @@ Theme.Colors = {
 	Info = Color3.fromRGB(40, 170, 255),
 	Purple = Color3.fromRGB(170, 90, 255),
 	Pink = Color3.fromRGB(255, 95, 190),
-	Text = Color3.fromRGB(40, 30, 60),
-	TextMuted = Color3.fromRGB(115, 100, 140),
+	-- Dark chips: round nav buttons (reference UI kit).
+	Chip = Color3.fromRGB(40, 52, 84),
+	-- Slate grey-blue (reference Home / Back buttons).
+	Slate = Color3.fromRGB(120, 140, 178),
+	Text = Color3.fromRGB(246, 248, 255),
+	TextMuted = Color3.fromRGB(170, 182, 210),
 	TextOnPrimary = Color3.fromRGB(255, 255, 255),
 	Stroke = Color3.fromRGB(32, 24, 52),
-	Disabled = Color3.fromRGB(185, 182, 198),
-	DisabledText = Color3.fromRGB(245, 245, 250),
+	Disabled = Color3.fromRGB(96, 106, 132),
+	DisabledText = Color3.fromRGB(200, 205, 220),
 	Backdrop = Color3.fromRGB(20, 12, 40),
 	Essence = Color3.fromRGB(150, 235, 120),
 	EssenceGlow = Color3.fromRGB(255, 245, 160),
@@ -44,11 +49,14 @@ Theme.Colors = {
 
 -- One accent per panel so each screen is recognisable at a glance.
 Theme.PanelAccent = {
-	Shop = Theme.Colors.Primary,
+	Shop = Theme.Colors.Danger,
 	Market = Theme.Colors.Accent,
 	Fair = Theme.Colors.Gold,
 	Champion = Theme.Colors.Purple,
 	Ribbons = Theme.Colors.Info,
+	Backpack = Theme.Colors.Info,
+	Tools = Theme.Colors.Info,
+	Settings = Theme.Colors.Gold,
 }
 
 --[[
@@ -60,8 +68,11 @@ Theme.Style = {
 	Outline = Color3.fromRGB(32, 24, 52),
 	OutlineThickness = 3,
 	PanelOutlineThickness = 4,
-	-- Cards inside panels get a softer outline so panels don't get busy.
-	CardOutlineTransparency = 0.55,
+	-- Cards and tiles on the dark panels get a thin light border.
+	CardOutline = Color3.fromRGB(88, 106, 150),
+	CardOutlineTransparency = 0,
+	-- Ring around the round nav buttons.
+	NavRing = Color3.fromRGB(110, 130, 175),
 	-- White text with a dark outline on anything colored.
 	TextOutline = 2.5,
 	TitleOutline = 3.5,
@@ -116,6 +127,12 @@ Theme.Size = {
 	RowButton = Vector2.new(112, 44),
 	MenuButton = 72,
 	MenuButtonPhone = 60,
+	NavButton = 58,
+	NavButtonPhone = 46,
+	ItemCard = Vector2.new(148, 186),
+	-- Reference-style rectangle buttons (HUD nav and menu).
+	ActionButton = Vector2.new(158, 50),
+	ActionButtonPhone = Vector2.new(124, 40),
 	SeedSlot = 76,
 	SeedSlotPhone = 64,
 	PillWidth = 220,

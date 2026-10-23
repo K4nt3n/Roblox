@@ -34,6 +34,11 @@ export type Plant = {
 	coGrowers: { number }?,
 	-- Paid skips used on this plant (honest shop: Natural Grown needs 0).
 	paidSkips: number?,
+	-- Bugs (Config.Pests): growth is paused from pestSince for at most pestMaxPause seconds.
+	pestSince: number?,
+	pestMaxPause: number?,
+	-- True once a fertilizer bag was used on this plant.
+	fertilized: boolean?,
 }
 
 export type Stage = "Seed" | "Sprout" | "Growing" | "Ripe" | "Giant"
@@ -88,9 +93,17 @@ function GrowthMath.newPlant(
 	}
 end
 
+-- Real seconds of growth lost to bugs so far (0 when there are none).
+function GrowthMath.pestPause(plant: Plant, now: number): number
+	if not plant.pestSince then
+		return 0
+	end
+	return math.clamp(now - plant.pestSince, 0, plant.pestMaxPause or 0)
+end
+
 -- Effective seconds of growth the plant has accumulated at time `now`.
 function GrowthMath.effectiveElapsed(plant: Plant, now: number): number
-	local real = math.max(0, now - plant.plantedAt)
+	local real = math.max(0, now - plant.plantedAt - GrowthMath.pestPause(plant, now))
 	return real * plant.speed + plant.bonusSeconds
 end
 
@@ -197,6 +210,26 @@ function GrowthMath.applyWater(plant: Plant, crop: any, config: any, now: number
 	plant.waterCount += 1
 	plant.lastWateredAt = now
 	return boost
+end
+
+-- Mutates the plant: bugs appear now and pause growth for up to maxPause seconds.
+function GrowthMath.addPests(plant: Plant, now: number, maxPause: number)
+	plant.pestSince = now
+	plant.pestMaxPause = maxPause
+end
+
+-- Mutates the plant: removes bugs, keeping the growth they cost as lost.
+function GrowthMath.removePests(plant: Plant, now: number)
+	local paused = GrowthMath.pestPause(plant, now)
+	plant.bonusSeconds -= paused * plant.speed
+	plant.pestSince = nil
+	plant.pestMaxPause = nil
+end
+
+-- Effective seconds one fertilizer bag adds.
+function GrowthMath.fertilizerBoostSeconds(crop: any, toolsConfig: any): number
+	local raw = crop.growSeconds * toolsConfig.fertilizerBoostFraction
+	return math.clamp(raw, toolsConfig.fertilizerMinBoostSeconds, toolsConfig.fertilizerMaxBoostSeconds)
 end
 
 -- Effective seconds needed to reach Ripe right now (0 if already ripe).

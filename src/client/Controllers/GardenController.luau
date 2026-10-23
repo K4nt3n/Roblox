@@ -13,6 +13,7 @@
 	* Champion plot: the label carries the champion's name and its current care
 	  need, and the Care prompt (F) lights up when a need is open. Co-growers
 	  get the same prompts on a friend's champion.
+	* Bugs (Config.Pests) crawl around a crop while it has pests.
 ]]
 
 local Players = game:GetService("Players")
@@ -46,6 +47,7 @@ type PlotView = {
 	plotId: string,
 	isChampion: boolean,
 	needK: number?,
+	bugs: Model?,
 }
 
 local CHAMPION = Config.Champion
@@ -88,6 +90,9 @@ local function plantFromAttributes(part: BasePart): GrowthMath.Plant?
 		care = CareMath.decodeDone(part:GetAttribute("careDone")),
 		name = part:GetAttribute("name"),
 		paidSkips = part:GetAttribute("paidSkips") or 0,
+		pestSince = part:GetAttribute("pestSince"),
+		pestMaxPause = part:GetAttribute("pestMaxPause"),
+		fertilized = part:GetAttribute("fertilized") == true,
 	} :: any
 end
 
@@ -160,12 +165,16 @@ local function track(part: BasePart)
 		plotId = part:GetAttribute("PlotId") or part.Name,
 		isChampion = isChampion,
 		needK = nil,
+		bugs = nil,
 	}
 	part.AncestryChanged:Connect(function()
 		if not part:IsDescendantOf(workspace) then
 			local view = views[part]
 			if view and view.visual then
 				view.visual.root:Destroy()
+			end
+			if view and view.bugs then
+				view.bugs:Destroy()
 			end
 			views[part] = nil
 		end
@@ -198,12 +207,12 @@ local function updatePrompts(view: PlotView, plant: GrowthMath.Plant?, state: Gr
 		care.ObjectText = cropName
 	end
 
+	-- Watering is only done with the Watering Bucket (equip it, click the crop), so
+	-- the Water prompt stays off everywhere.
+	water.Enabled = false
+
 	if not isMine then
 		main.Enabled = false
-		local canWater = plant ~= nil and state ~= nil and not state.isMaxed
-		water.Enabled = canWater
-		water.ActionText = if need and need.kind == "Water" then "Water (thirsty!)" else "Water"
-		water.ObjectText = ownerName(view.ownerUserId) .. "'s " .. cropName
 		return
 	end
 
@@ -224,21 +233,12 @@ local function updatePrompts(view: PlotView, plant: GrowthMath.Plant?, state: Gr
 		water.Enabled = false
 		return
 	end
-	local thirsty = need ~= nil and need.kind == "Water"
-
-	local cooldown = if plant.lastWateredAt > 0 then plant.lastWateredAt + Config.Watering.plantCooldownSeconds - now else 0
 	if state.canHarvest then
 		main.ActionText = "Harvest"
 		main.ObjectText = cropName .. " · " .. Format.weight(state.weight)
-		-- Ripe crops can still be watered toward Giant size.
-		water.Enabled = not state.isMaxed and cooldown <= 0
-		water.ActionText = if thirsty then "Water (thirsty!)" else "Water"
-		water.ObjectText = "Grow it bigger!"
 	else
-		main.ActionText = if cooldown > 0 then "Watered" elseif thirsty then "Water (thirsty!)" else "Water"
-		main.ObjectText = cropName
-		main.Enabled = cooldown <= 0
-		water.Enabled = false
+		-- Growing: nothing to press. Water it with the bucket.
+		main.Enabled = false
 	end
 end
 
@@ -272,7 +272,53 @@ local function updateLabel(view: PlotView, plant: GrowthMath.Plant?, state: Grow
 		end
 		return
 	end
+	if plant.pestSince then
+		timeText = "Bugs! Growth paused"
+	end
 	view.label.Text = Format.weight(state.weight) .. gene .. "\n" .. timeText
+end
+
+local BUG_COUNT = 4
+
+-- Small dark bugs circling the crop while it has pests.
+local function updateBugs(view: PlotView, hasPests: boolean, t: number)
+	if not hasPests then
+		if view.bugs then
+			view.bugs:Destroy()
+			view.bugs = nil
+		end
+		return
+	end
+	local bugs = view.bugs
+	if not bugs then
+		local model = Instance.new("Model")
+		model.Name = "Bugs"
+		for i = 1, BUG_COUNT do
+			local bug = Instance.new("Part")
+			bug.Name = "Bug"
+			bug.Shape = Enum.PartType.Ball
+			bug.Size = Vector3.one * 0.45
+			bug.Color = if i % 2 == 0 then Color3.fromRGB(40, 35, 30) else Color3.fromRGB(70, 110, 40)
+			bug.Material = Enum.Material.SmoothPlastic
+			bug.Anchored = true
+			bug.CanCollide = false
+			bug.CanQuery = false
+			bug.CanTouch = false
+			bug.CastShadow = false
+			bug.Parent = model
+		end
+		model.Parent = view.part
+		view.bugs = model
+		bugs = model
+	end
+	local radius = math.max(0.9, view.shownScale * 0.55)
+	local height = view.part.Size.Y / 2 + view.shownScale * 0.7
+	for i, bug in (bugs :: Model):GetChildren() do
+		local a = t * 2.5 + i * (math.pi * 2 / BUG_COUNT)
+		local offset = Vector3.new(math.cos(a) * radius, height + math.sin(t * 7 + i) * 0.25, math.sin(a) * radius)
+		local bugPart = bug :: BasePart
+		bugPart.CFrame = CFrame.new(view.part.Position + offset)
+	end
 end
 
 local function step(dt: number)
@@ -315,6 +361,8 @@ local function step(dt: number)
 			view.stage = nil
 		end
 
+		updateBugs(view, plant ~= nil and (plant :: any).pestSince ~= nil, os.clock())
+
 		if refreshText then
 			updateLabel(view, plant, state, now)
 			updatePrompts(view, plant, state, now)
@@ -349,8 +397,10 @@ local function onFeel(name: string, context: { [string]: any })
 		view.velocity += 4
 	elseif name == Net.Feedback.Planted then
 		view.velocity += 6
-	elseif name == Net.Feedback.CareDone then
+	elseif name == Net.Feedback.CareDone or name == Net.Feedback.PestsRemoved then
 		view.velocity += 5
+	elseif name == Net.Feedback.Fertilized then
+		view.velocity += 7
 	end
 	Tweens.pop(view.label, 0.25)
 end
@@ -399,5 +449,31 @@ function GardenController.start()
 end
 
 GardenController.PanelRequested = require(Shared.Signal).new() -- (panelName)
+
+-- The plot part `instance` belongs to (a plot or anything on it), if any.
+function GardenController.plotFor(instance: Instance?): BasePart?
+	local current = instance
+	while current and current ~= workspace do
+		if current:IsA("BasePart") and views[current] then
+			return current
+		end
+		current = current.Parent
+	end
+	return nil
+end
+
+-- The closest plot with something planted within `range` studs of `position`.
+function GardenController.nearestPlot(position: Vector3, range: number): BasePart?
+	local best, bestDistance = nil, range
+	for part in views do
+		if part:GetAttribute("cropId") then
+			local distance = (part.Position - position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = part, distance
+			end
+		end
+	end
+	return best
+end
 
 return GardenController

@@ -164,6 +164,8 @@ Config.Plots = {
 Config.Economy = {
 	startingCoins = 50,
 	startingSeeds = { carrot = 3 },
+	-- supplyId -> count a new player starts with (see Config.Supplies).
+	startingSupplies = { fertilizer = 3 },
 	maxProduceInventory = 60,
 	-- Bonus multiplier on sale price for crops that reached Giant stage.
 	giantSellBonus = 1.25,
@@ -199,6 +201,51 @@ Config.Upgrades = {
 		values = { 1, 1.15, 1.3, 1.5, 1.75 },
 	},
 } :: { [string]: UpgradeDef }
+
+-- Consumables bought in the Seed Shop and used with a garden tool.
+Config.Supplies = {
+	fertilizer = {
+		id = "fertilizer",
+		displayName = "Fertilizer Bag",
+		description = "Equip the bag and use it on a plant for a one-time growth boost.",
+		cost = 40,
+		order = 1,
+	},
+}
+
+--[[
+	Garden tools given to every player (StarterPack). `id` matches the Tool's
+	"GardenTool" attribute. Using one sends Net.Actions.UseTool; the server
+	checks the tool is equipped and the plot is within useDistance.
+]]
+Config.Tools = {
+	useDistance = 14,
+	-- Seconds between two uses of the same tool by one player.
+	cooldownSeconds = 0.8,
+	items = {
+		WateringBucket = { id = "WateringBucket", displayName = "Watering Bucket" },
+		PestRemover = { id = "PestRemover", displayName = "Pest Remover" },
+		Fertilizer = { id = "Fertilizer", displayName = "Fertilizer", supply = "fertilizer" },
+	},
+	-- Fertilizer bag: one boost per plant, as a fraction of the crop's growSeconds.
+	fertilizerBoostFraction = 0.15,
+	fertilizerMinBoostSeconds = 15,
+	fertilizerMaxBoostSeconds = 45 * MINUTE,
+	xpPerFertilize = 2,
+}
+
+-- Bugs on regular (non-champion) plots. They only appear while the owner is in
+-- the server and pause that crop's growth until removed with the Pest Remover,
+-- for at most maxPauseSeconds, so nobody is punished for being offline.
+Config.Pests = {
+	checkSeconds = 20,
+	-- Chance per check for each growing (not yet ripe) crop.
+	chance = 0.08,
+	maxPauseSeconds = 5 * MINUTE,
+	xpPerRemove = 3,
+	-- Helping a friend with their bugs tips you this many Coins.
+	friendRewardCoins = 3,
+}
 
 Config.Levels = {
 	-- XP needed to reach level n + 1 from level n is xpBase * n ^ xpExponent.
@@ -400,6 +447,9 @@ Config.World = {
 	plotSize = 8,
 	plotGap = 3,
 	promptDistance = 10,
+	-- New arrivals pick a free garden slot (walk up + E, or "Pick for me"). After this
+	-- many seconds without a choice the server picks one for them.
+	autoPickSeconds = 45,
 	-- Placeholder palette (soft, saturated, kid friendly). Art replaces these later.
 	colors = {
 		soil = { 120, 85, 60 },

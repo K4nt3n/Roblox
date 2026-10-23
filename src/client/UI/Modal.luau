@@ -75,17 +75,14 @@ local function showNext()
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(Theme.Size.ModalWidth, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = Color3.new(1, 1, 1),
+		-- Flat colour: a UIGradient on a CanvasGroup would tint everything inside it.
+		BackgroundColor3 = Theme.Colors.Background:Lerp(accent, 0.08),
 		BorderSizePixel = 0,
 		Parent = backdrop,
 	}, {
 		UIKit.corner(UDim.new(0, 22)),
 		UIKit.padding(18),
 		UIKit.list(Enum.FillDirection.Vertical, 10, Enum.HorizontalAlignment.Center),
-		UIKit.new("UIGradient", {
-			Rotation = 90,
-			Color = ColorSequence.new(Theme.lighten(accent, 0.7), Theme.Colors.Background),
-		}),
 	})
 	UIKit.outline(card, Theme.Style.PanelOutlineThickness)
 

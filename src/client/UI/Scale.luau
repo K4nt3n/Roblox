@@ -13,9 +13,13 @@
 	scale changes (rotation, window resize).
 
 	Settings hook (G10): set Scale.setUserMultiplier(0.9..1.2) for a UI size slider.
+
+	Studio preview: set a Workspace attribute UIPreviewDevice = "Phone" (or
+	"Tablet") before pressing Play to see that layout on a PC. Ignored in live games.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Signal = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Signal"))
@@ -43,6 +47,10 @@ local function viewport(): Vector2
 end
 
 local function classify(size: Vector2): Device
+	local preview = workspace:GetAttribute("UIPreviewDevice")
+	if RunService:IsStudio() and (preview == "Phone" or preview == "Tablet") then
+		return preview
+	end
 	if not UserInputService.TouchEnabled then
 		return "Desktop"
 	end

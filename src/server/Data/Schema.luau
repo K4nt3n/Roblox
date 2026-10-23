@@ -16,6 +16,10 @@ function Schema.default(config: any): { [string]: any }
 	for cropId, count in config.Economy.startingSeeds do
 		seeds[cropId] = count
 	end
+	local supplies = {}
+	for supplyId, count in config.Economy.startingSupplies or {} do
+		supplies[supplyId] = count
+	end
 	local upgrades = {}
 	for id in config.Upgrades do
 		upgrades[id] = 0
@@ -31,6 +35,8 @@ function Schema.default(config: any): { [string]: any }
 		-- cropId -> count
 		seeds = seeds,
 		selectedSeed = "carrot",
+		-- supplyId -> count (consumables like fertilizer bags)
+		supplies = supplies,
 		-- array of { uid, cropId, weight, isGiant, harvestedAt }
 		produce = {},
 		nextUid = 1,

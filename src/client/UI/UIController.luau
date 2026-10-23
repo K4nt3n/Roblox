@@ -44,6 +44,11 @@ local Modal = require(script.Parent.Modal)
 local LevelBar = require(script.Parent.LevelBar)
 local ShopPanel = require(script.Parent.ShopPanel)
 local BasketPanel = require(script.Parent.BasketPanel)
+local BackpackPanel = require(script.Parent.BackpackPanel)
+local ToolsPanel = require(script.Parent.ToolsPanel)
+local SettingsPanel = require(script.Parent.SettingsPanel)
+local Icons = require(script.Parent.Icons)
+local PromptUI = require(script.Parent.PromptUI)
 local FairPanel = require(script.Parent.FairPanel)
 local ChampionPanel = require(script.Parent.ChampionPanel)
 local RibbonPanel = require(script.Parent.RibbonPanel)
@@ -83,6 +88,17 @@ local REASONS: { [string]: string } = {
 	BadName = "Try a different name (1-20 letters).",
 	FilterFailed = "Couldn't check that name. Try another!",
 	NotChampion = "That's not a champion plot.",
+	PlotTaken = "Someone just took that plot. Pick another!",
+	NoFreePlot = "Every plot is taken right now.",
+	NothingPlanted = "Nothing is planted there yet.",
+	NoPests = "No bugs on this one!",
+	TooFar = "Get a little closer to the plant!",
+	NoPlot = "Stand next to a plant to use that.",
+	AlreadyFertilized = "This plant was already fertilized.",
+	NoFertilizer = "Out of fertilizer. Buy more at the Seed Shop!",
+	NotYourPlot = "You can only fertilize your own plants.",
+	UseBucket = "Equip the Watering Bucket and click the plant to water it!",
+	ClickCrop = "Click the crop you want to water.",
 }
 
 local CARE_DONE: { [string]: string } = {
@@ -103,6 +119,41 @@ local CARE_NEEDED: { [string]: string } = {
 -- Kept for existing callers. priority: "Low" | "Normal" | "High".
 function UIController.toast(text: string, color: Color3?, duration: number?, priority: Toasts.Priority?)
 	Toasts.push(text, { color = color, duration = duration, priority = priority })
+end
+
+-- A notification card: kind sets colour and icon (Success / Info / Reward / Warning / Error).
+function UIController.notify(kind: Toasts.Kind, text: string, subtitle: string?, icon: string?, priority: Toasts.Priority?)
+	Toasts.push(text, { kind = kind, subtitle = subtitle, icon = icon, priority = priority, duration = 3 })
+end
+
+local function plural(count: number, word: string): string
+	return if count == 1 then word else word .. "s"
+end
+
+-- "You bought ..." card for a Purchased feedback event.
+local function notifyPurchase(ctx: { [string]: any })
+	local amount = ctx.amount or 1
+	if ctx.kind == "Seed" then
+		local crop = Config.Crops[ctx.cropId]
+		local name = if crop then crop.displayName else ""
+		UIController.notify(
+			"Success",
+			string.format("You bought %s %s!", name, plural(amount, "Seed")),
+			string.format("+%d %s %s", amount, name, plural(amount, "Seed")),
+			Icons.forSlot("Seed_" .. tostring(ctx.cropId))
+		)
+	elseif ctx.kind == "Supply" then
+		local def = Config.Supplies[ctx.supplyId]
+		local name = if def then def.displayName else "supplies"
+		UIController.notify("Success", "You bought " .. name .. "!", "+" .. amount .. " " .. name, Icons.forSlot("Supply_" .. tostring(ctx.supplyId)))
+	elseif ctx.kind == "Upgrade" then
+		local def = Config.Upgrades[ctx.upgradeId]
+		UIController.notify("Info", "Upgrade bought!", string.format("%s is now level %d", if def then def.displayName else "", ctx.level or 1), "Upgrades")
+	elseif ctx.kind == "Plot" then
+		UIController.notify("Success", "New plot unlocked!", "Plot " .. tostring(ctx.plotId) .. " is ready to plant", "Plot")
+	elseif ctx.kind == "Coins" then
+		UIController.notify("Reward", "+" .. Format.coins(amount) .. " Coins!", nil, "Coins", "High")
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -315,11 +366,13 @@ function UIController.close()
 	UIController.Closed:Fire(name)
 end
 
-function UIController.toggle(name: string)
-	if openPanel == name then
+-- Opens a panel (on `tab` if given), or closes it when it is already showing that tab.
+function UIController.toggle(name: string, tab: string?)
+	local state = panels[name]
+	if openPanel == name and (tab == nil or (state and state.tab == tab)) then
 		UIController.close()
 	else
-		UIController.open(name)
+		UIController.open(name, tab)
 	end
 end
 
@@ -365,6 +418,29 @@ local function registerBuiltIns()
 		glyph = "R",
 		render = RibbonPanel.render,
 	})
+	UIController.registerPanel("Backpack", {
+		title = "Backpack",
+		glyph = "B",
+		tabs = BackpackPanel.TABS,
+		defaultTab = "seeds",
+		render = BackpackPanel.render,
+	})
+	UIController.registerPanel("Tools", {
+		title = "Garden Tools",
+		glyph = "T",
+		render = ToolsPanel.render,
+	})
+	UIController.registerPanel("Settings", {
+		title = "Settings",
+		glyph = "S",
+		render = SettingsPanel.render,
+	})
+	BackpackPanel.open = UIController.open
+	ToolsPanel.open = UIController.open
+	ToolsPanel.close = UIController.close
+	SettingsPanel.refresh = function()
+		renderPanel("Settings", true)
+	end
 end
 
 local function buildPanels(playerGui: Instance)
@@ -478,6 +554,27 @@ local function onFeel(name: string, ctx: { [string]: any })
 		Hud.celebrate("Market", nil, if ctx.isGiant then 0.25 else 0.12)
 	elseif name == Net.Feedback.Sold then
 		Hud.coinBurst(ctx.coins or 0, pressOrigin())
+		UIController.notify("Reward", "You earned " .. Format.coins(ctx.coins or 0) .. " Coins!", "From selling your crops", "Coins")
+	elseif name == Net.Feedback.Purchased then
+		notifyPurchase(ctx)
+	elseif name == Net.Feedback.PestsAppeared then
+		local crop = Config.Crops[ctx.cropId]
+		UIController.notify("Warning", string.format("Bugs on your %s!", crop and crop.displayName or "crop"), "Use the Pest Remover", "Bugs", "High")
+	elseif name == Net.Feedback.PestsRemoved then
+		local helped = ctx.helperName ~= nil and ctx.ownerUserId == localPlayer.UserId and ctx.helperName ~= localPlayer.DisplayName
+		if helped then
+			UIController.notify("Success", ctx.helperName .. " got rid of your bugs!", nil, "Bugs")
+		else
+			UIController.notify("Success", "Bugs gone!", if ctx.coins then "+" .. ctx.coins .. " Coins for helping" else nil, "Bugs")
+			if ctx.xp and ctx.xp > 0 then
+				LevelBar.essence(ctx.position, ctx.xp)
+			end
+		end
+	elseif name == Net.Feedback.Fertilized then
+		UIController.notify("Success", "Fertilized!", string.format("%d bag%s left", ctx.bagsLeft or 0, if ctx.bagsLeft == 1 then "" else "s"), "Fertilizer")
+		if ctx.xp and ctx.xp > 0 then
+			LevelBar.essence(ctx.position, ctx.xp)
+		end
 	elseif name == Net.Feedback.FriendWateredYou then
 		toast(ctx.friendName .. " watered your garden!", C.Primary)
 	elseif name == Net.Feedback.YouWateredFriend then
@@ -575,7 +672,7 @@ local function onFeel(name: string, ctx: { [string]: any })
 		local reason = REASONS[ctx.reason or ""]
 		if reason then
 			local extra = if ctx.wait and ctx.wait > 0 then " (" .. Format.duration(ctx.wait) .. ")" else ""
-			toast(reason .. extra, nil, 2, "Low")
+			Toasts.push(reason .. extra, { kind = "Error", duration = 2, priority = "Low" })
 		end
 	end
 end
@@ -587,6 +684,7 @@ function UIController.start()
 	end)
 	buildPanels(playerGui)
 	registerBuiltIns()
+	PromptUI.start(playerGui)
 	Modal.parent = playerGui
 	UIKit.onDisabledPress = function(reason)
 		UIController.toast(reason, nil, 2, "Low")

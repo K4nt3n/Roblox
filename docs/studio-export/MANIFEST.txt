@@ -1,0 +1,54 @@
+Studio export of "Projekt 1" (placeId 117904480011337, Team Create), taken 2026-10-23.
+Read-only export: nothing in Studio or in the repo was changed.
+Each exported file was checked against a djb2 checksum of the Studio Source and matches byte for byte.
+Paths mirror the repo (default.project.json):
+  src/client = StarterPlayer.StarterPlayerScripts.Client
+  src/shared = ReplicatedStorage.Shared
+  src/server = ServerScriptService.Server
+"new" = not in repo main; "changed" = exists in repo main with different content.
+
+EXPORTED (31)
+Studio instance path | class | lines | status | file
+StarterPlayer.StarterPlayerScripts.Client | LocalScript | 24 | changed | src/client/init.client.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.ArtSlot | ModuleScript | 152 | changed | src/client/UI/ArtSlot.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.Hud | ModuleScript | 650 | changed | src/client/UI/Hud.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.Modal | ModuleScript | 189 | changed | src/client/UI/Modal.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.Scale | ModuleScript | 149 | changed | src/client/UI/Scale.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.ShopPanel | ModuleScript | 303 | changed | src/client/UI/ShopPanel.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.Theme | ModuleScript | 224 | changed | src/client/UI/Theme.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.Toasts | ModuleScript | 298 | changed | src/client/UI/Toasts.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.UIController | ModuleScript | 712 | changed | src/client/UI/UIController.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.UIKit | ModuleScript | 1115 | changed | src/client/UI/UIKit.luau
+StarterPlayer.StarterPlayerScripts.Client.Controllers.GardenController | ModuleScript | 479 | changed | src/client/Controllers/GardenController.luau
+ReplicatedStorage.Shared.Config | ModuleScript | 474 | changed | src/shared/Config.luau
+ReplicatedStorage.Shared.GrowthMath | ModuleScript | 246 | changed | src/shared/GrowthMath.luau
+ReplicatedStorage.Shared.Net | ModuleScript | 75 | changed | src/shared/Net.luau
+ServerScriptService.Server | Script | 48 | changed | src/server/init.server.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.BackpackPanel | ModuleScript | 154 | new | src/client/UI/BackpackPanel.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.Icons | ModuleScript | 274 | new | src/client/UI/Icons.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.PromptUI | ModuleScript | 245 | new | src/client/UI/PromptUI.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.SettingsPanel | ModuleScript | 66 | new | src/client/UI/SettingsPanel.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.ToolBar | ModuleScript | 269 | new | src/client/UI/ToolBar.luau
+StarterPlayer.StarterPlayerScripts.Client.UI.ToolsPanel | ModuleScript | 97 | new | src/client/UI/ToolsPanel.luau
+StarterPlayer.StarterPlayerScripts.Client.Controllers.DialogueController | ModuleScript | 451 | new | src/client/Controllers/DialogueController.luau
+StarterPlayer.StarterPlayerScripts.Client.Controllers.PlotPicker | ModuleScript | 91 | new | src/client/Controllers/PlotPicker.luau
+StarterPlayer.StarterPlayerScripts.Client.Controllers.ToolController | ModuleScript | 312 | new | src/client/Controllers/ToolController.luau
+ReplicatedStorage.Shared.DialogueConfig | ModuleScript | 73 | new | src/shared/DialogueConfig.luau
+
+ServerScriptService.Server.Data.Schema | ModuleScript | 134 | changed | src/server/Data/Schema.luau
+ServerScriptService.Server.Services.ChampionService | ModuleScript | 285 | changed | src/server/Services/ChampionService.luau
+ServerScriptService.Server.Services.EconomyService | ModuleScript | 261 | changed | src/server/Services/EconomyService.luau
+ServerScriptService.Server.Services.GardenService | ModuleScript | 488 | changed | src/server/Services/GardenService.luau
+ServerScriptService.Server.Services.PlotService | ModuleScript | 501 | changed | src/server/Services/PlotService.luau
+ServerScriptService.Server.Services.ToolService | ModuleScript | 217 | new | src/server/Services/ToolService.luau
+
+REFERENCE ONLY (not in a Rojo-synced folder)
+ServerScriptService.PlayerData | Script | 100 | unsynced | unsynced/PlayerData.server.luau
+
+Total: 31 synced scripts (19 changed, 12 new) + 1 reference script.
+
+LISTED ONLY (outside the Rojo-synced folders, not exported)
+StarterPack: Tool "WateringBucket" (GardenTool=WateringBucket), Tool "PestRemover" (GardenTool=PestRemover), Tool "Fertilizer" (GardenTool=Fertilizer)
+Workspace.NPCs: Models FairJudge, MarketMerchant, SeedSeller
+Workspace.Stands: Parts FairStand, SeedShop, Market
+ReplicatedStorage.MapAssets: Models RoundTree (5 descendants), FruitTree (10), BlossomTree (5), Bush (3), Rock (2), FlowerPatch (8)

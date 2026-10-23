@@ -9,6 +9,8 @@
 	* On join, a "welcome back" summary lists what ripened while you were away.
 	* A light server loop watches for stage changes so it can fire feel events
 	  (e.g. "your pumpkin just became a Giant!") without the client polling.
+	* New arrivals claim a free garden slot (prompt or "Pick for me"); if they
+	  don't choose within Config.World.autoPickSeconds, one is picked for them.
 ]]
 
 local Players = game:GetService("Players")
@@ -28,6 +30,8 @@ local rng = Random.new()
 local friendCache: { [string]: boolean } = {}
 -- Last known stage per player/plot, used to detect transitions.
 local lastStages: { [Player]: { [string]: string } } = {}
+-- Players whose profile has loaded but who haven't claimed a garden yet (value: join info).
+local pendingClaims: { [Player]: { [string]: any } } = {}
 
 local STAGE_CHECK_SECONDS = 1
 
@@ -59,14 +63,24 @@ function GardenService:Start()
 	local NetService = Services.NetService
 
 	DataService.ProfileLoaded:Connect(function(player, data, info)
-		PlotService:AssignGarden(player)
-		PlotService:SyncAll(player, data)
-		lastStages[player] = self:_currentStages(data)
-		self:_sendWelcomeBack(player, data, info)
-		self:_moveToGarden(player)
-		player.CharacterAdded:Connect(function()
-			task.defer(self._moveToGarden, self, player)
+		pendingClaims[player] = info
+		task.delay(Config.World.autoPickSeconds, function()
+			if pendingClaims[player] and player.Parent then
+				self:ClaimGarden(player, nil)
+			end
 		end)
+	end)
+
+	PlotService.ClaimRequested:Connect(function(player, slot)
+		local ok, reason = self:ClaimGarden(player, slot)
+		if not ok and reason ~= "AlreadyClaimed" then
+			NetService:Feedback(player, Net.Feedback.Denied, { action = Net.Actions.ClaimPlot, reason = reason })
+		end
+	end)
+
+	NetService:Handle(Net.Actions.ClaimPlot, function(player, payload)
+		local slot = payload.slot
+		return self:ClaimGarden(player, if type(slot) == "number" then slot else nil)
 	end)
 
 	DataService.Dirty:Connect(function(player)
@@ -78,6 +92,7 @@ function GardenService:Start()
 
 	Players.PlayerRemoving:Connect(function(player)
 		lastStages[player] = nil
+		pendingClaims[player] = nil
 	end)
 
 	PlotService.PromptTriggered:Connect(function(player, ownerUserId, plotId, kind)
@@ -91,7 +106,8 @@ function GardenService:Start()
 		elseif owner == player and kind == "Main" then
 			ok, reason = self:PrimaryAction(player, plotId)
 		else
-			ok, reason = self:Water(player, owner, plotId)
+			-- Watering only happens with the Watering Bucket (ToolService), never a prompt.
+			ok, reason = false, "UseBucket"
 		end
 		-- Prompts bypass NetService, so surface failures here (Water already reports its own).
 		if not ok and type(reason) == "string" and reason ~= "Cooldown" and reason ~= "Maxed" then
@@ -118,6 +134,28 @@ function GardenService:Start()
 			end
 		end
 	end)
+end
+
+-- Builds the player's garden on `slot` (nil = any free slot), syncs it and moves them there.
+function GardenService:ClaimGarden(player: Player, slot: number?): (boolean, any)
+	local PlotService = Services.PlotService
+	local info = pendingClaims[player]
+	local data = Services.DataService:Get(player)
+	if not info or not data then
+		return false, if PlotService:GetGarden(player) then "AlreadyClaimed" else "NotLoaded"
+	end
+	if not PlotService:AssignGarden(player, slot) then
+		return false, if slot then "PlotTaken" else "NoFreePlot"
+	end
+	pendingClaims[player] = nil
+	PlotService:SyncAll(player, data)
+	lastStages[player] = self:_currentStages(data)
+	self:_sendWelcomeBack(player, data, info)
+	self:_moveToGarden(player)
+	player.CharacterAdded:Connect(function()
+		task.defer(self._moveToGarden, self, player)
+	end)
+	return true, nil
 end
 
 function GardenService:_moveToGarden(player: Player)
@@ -185,7 +223,7 @@ function GardenService:_sendWelcomeBack(player: Player, data: { [string]: any },
 	})
 end
 
--- E on your own plot: plant when empty, harvest when ripe, otherwise water.
+-- E on your own plot: plant when empty, harvest when ripe. Watering needs the bucket.
 function GardenService:PrimaryAction(player: Player, plotId: string): (boolean, any)
 	local data = Services.DataService:Get(player)
 	if not data then
@@ -207,7 +245,7 @@ function GardenService:PrimaryAction(player: Player, plotId: string): (boolean, 
 	if crop and GrowthMath.evaluate(plant, crop, Config, os.time()).canHarvest then
 		return self:Harvest(player, plotId)
 	end
-	return self:Water(player, player, plotId)
+	return false, "UseBucket"
 end
 
 function GardenService:Plant(player: Player, plotId: string, cropId: string): (boolean, any)

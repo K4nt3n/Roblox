@@ -7,6 +7,8 @@
 	  growth locally every frame from these, so crops swell smoothly with zero
 	  network traffic while the server stays authoritative.
 	* Creates ProximityPrompts; GardenService decides what a trigger does.
+	* Shows a "Free Plot" sign on every unclaimed slot; its Claim prompt fires
+	  ClaimRequested and GardenService builds the garden.
 
 	Art seam: if Workspace.GardenSlots contains parts, gardens are centered on
 	them instead of the generated grid. Everything visual about crops lives on
@@ -24,8 +26,11 @@ local CareMath = require(Shared.CareMath)
 local PlotService = {}
 
 PlotService.PromptTriggered = Signal.new() -- (player, ownerUserId, plotId, promptKind: "Main" | "Water" | "Care")
+PlotService.ClaimRequested = Signal.new() -- (player, slot)
 
 local gardensFolder: Folder
+local claimsFolder: Folder
+local claimMarkers: { [number]: Model } = {}
 local slotOwners: { [number]: Player } = {}
 local playerSlots: { [Player]: number } = {}
 local gardens: { [Player]: Model } = {}
@@ -44,6 +49,9 @@ local PLANT_ATTRIBUTES = {
 	"careScore",
 	"name",
 	"paidSkips",
+	"pestSince",
+	"pestMaxPause",
+	"fertilized",
 }
 
 local function rgb(t: { number }): Color3
@@ -60,6 +68,19 @@ local function slotCFrame(slot: number): CFrame
 	local col = (slot - 1) % 4
 	local row = (slot - 1) // 4
 	return CFrame.new((col - 1.5) * w.gardenSpacing, 0, (row + 0.5) * w.gardenSpacing + 20)
+end
+
+-- The map's GardenSlots decide how many gardens fit; otherwise the generated grid does.
+local function slotCount(): number
+	local anchors = workspace:FindFirstChild("GardenSlots")
+	local count = if anchors then #anchors:GetChildren() else 0
+	return if count > 0 then count else Config.World.gardenSlots
+end
+
+local function gardenSize(): (number, number)
+	local w = Config.World
+	local rows = math.ceil(Config.Plots.maxPlots / w.plotsPerRow)
+	return w.plotsPerRow * (w.plotSize + w.plotGap) + w.plotGap, rows * (w.plotSize + w.plotGap) + w.plotGap
 end
 
 local function makePrompt(parent: Instance, name: string, key: Enum.KeyCode, actionText: string): ProximityPrompt
@@ -83,9 +104,7 @@ local function buildGarden(player: Player, slot: number): Model
 	model:SetAttribute("OwnerUserId", player.UserId)
 
 	local origin = slotCFrame(slot)
-	local rows = math.ceil(Config.Plots.maxPlots / w.plotsPerRow)
-	local width = w.plotsPerRow * (w.plotSize + w.plotGap) + w.plotGap
-	local depth = rows * (w.plotSize + w.plotGap) + w.plotGap
+	local width, depth = gardenSize()
 
 	local base = Instance.new("Part")
 	base.Name = "Base"
@@ -179,10 +198,76 @@ local function buildGarden(player: Player, slot: number): Model
 	return model
 end
 
+-- An empty slot: a faint outline of the garden and a sign you press E at to claim it.
+local function setClaimMarker(slot: number, visible: boolean)
+	local existing = claimMarkers[slot]
+	if not visible then
+		if existing then
+			existing:Destroy()
+			claimMarkers[slot] = nil
+		end
+		return
+	end
+	if existing then
+		return
+	end
+	local w = Config.World
+	local origin = slotCFrame(slot)
+	local width, depth = gardenSize()
+	local model = Instance.new("Model")
+	model.Name = tostring(slot)
+
+	local outline = Instance.new("Part")
+	outline.Name = "Outline"
+	outline.Anchored = true
+	outline.CanCollide = false
+	outline.CanQuery = false
+	outline.CanTouch = false
+	outline.CastShadow = false
+	outline.Transparency = 0.5
+	outline.Size = Vector3.new(width, 0.2, depth + 8)
+	outline.CFrame = origin * CFrame.new(0, 0.1, 0)
+	outline.Color = rgb(w.colors.soil)
+	outline.Material = Enum.Material.SmoothPlastic
+	outline.Parent = model
+
+	local sign = Instance.new("Part")
+	sign.Name = "Sign"
+	sign.Anchored = true
+	sign.Size = Vector3.new(1, 5, 1)
+	sign.CFrame = origin * CFrame.new(0, 2.5, depth / 2 + 6)
+	sign.Color = rgb(w.colors.stand)
+	sign.Material = Enum.Material.SmoothPlastic
+	sign:SetAttribute("Slot", slot)
+	sign.Parent = model
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.fromOffset(200, 50)
+	billboard.StudsOffset = Vector3.new(0, 4.5, 0)
+	billboard.MaxDistance = 150
+	billboard.Parent = sign
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextStrokeTransparency = 0.4
+	label.Text = "Free Plot"
+	label.Parent = billboard
+	local prompt = makePrompt(sign, "Claim", Enum.KeyCode.E, "Claim")
+	prompt.ObjectText = "Free Plot"
+
+	model.Parent = claimsFolder
+	claimMarkers[slot] = model
+end
+
 function PlotService:Init()
 	gardensFolder = Instance.new("Folder")
 	gardensFolder.Name = "Gardens"
 	gardensFolder.Parent = workspace
+	claimsFolder = Instance.new("Folder")
+	claimsFolder.Name = "PlotClaims"
+	claimsFolder.Parent = workspace
 end
 
 -- Placeholder stands for the shop, market and fair. Map art can replace these by
@@ -283,10 +368,22 @@ function PlotService:Start()
 	end
 	buildStands()
 	buildFairStage()
+	for slot = 1, slotCount() do
+		if not slotOwners[slot] then
+			setClaimMarker(slot, true)
+		end
+	end
 
 	local ProximityPromptService = game:GetService("ProximityPromptService")
 	ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		local plot = prompt.Parent
+		if plot and plot:IsDescendantOf(claimsFolder) then
+			local slot = plot:GetAttribute("Slot")
+			if type(slot) == "number" then
+				self.ClaimRequested:Fire(player, slot)
+			end
+			return
+		end
 		if not plot or not plot:IsA("BasePart") or not plot:IsDescendantOf(gardensFolder) then
 			return
 		end
@@ -304,21 +401,37 @@ function PlotService:Start()
 	end)
 end
 
-function PlotService:AssignGarden(player: Player): Model?
+-- Builds the player's garden on `preferredSlot`, or on a random free slot when nil.
+-- Returns nil if that slot is taken or nothing is free.
+function PlotService:AssignGarden(player: Player, preferredSlot: number?): Model?
 	if gardens[player] then
 		return gardens[player]
 	end
-	for slot = 1, Config.World.gardenSlots do
-		if not slotOwners[slot] then
-			slotOwners[slot] = player
-			playerSlots[player] = slot
-			local model = buildGarden(player, slot)
-			gardens[player] = model
-			return model
+	local slot: number
+	if preferredSlot then
+		if preferredSlot < 1 or preferredSlot > slotCount() or slotOwners[preferredSlot] then
+			return nil
 		end
+		slot = preferredSlot
+	else
+		local free = {}
+		for s = 1, slotCount() do
+			if not slotOwners[s] then
+				table.insert(free, s)
+			end
+		end
+		if #free == 0 then
+			warn("[PlotService] No free garden slot for " .. player.Name)
+			return nil
+		end
+		slot = free[math.random(#free)]
 	end
-	warn("[PlotService] No free garden slot for " .. player.Name)
-	return nil
+	slotOwners[slot] = player
+	playerSlots[player] = slot
+	setClaimMarker(slot, false)
+	local model = buildGarden(player, slot)
+	gardens[player] = model
+	return model
 end
 
 function PlotService:ReleaseGarden(player: Player)
@@ -326,6 +439,7 @@ function PlotService:ReleaseGarden(player: Player)
 	if slot then
 		slotOwners[slot] = nil
 		playerSlots[player] = nil
+		setClaimMarker(slot, true)
 	end
 	if gardens[player] then
 		gardens[player]:Destroy()

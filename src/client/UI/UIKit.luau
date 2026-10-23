@@ -29,6 +29,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Theme = require(script.Parent.Theme)
 local ArtSlot = require(script.Parent.ArtSlot)
+local Icons = require(script.Parent.Icons)
 local Tweens = require(script.Parent.Parent.Feel.Tweens)
 local EssenceFX = require(script.Parent.Parent.Feel.EssenceFX)
 local FeelController = require(script.Parent.Parent.Feel.FeelController)
@@ -288,7 +289,8 @@ function UIKit.card(props: Props?, children: { Instance }?): Frame
 		BorderSizePixel = 0,
 	}, children)
 	UIKit.corner().Parent = frame
-	UIKit.outline(frame, 2.5, Theme.Style.CardOutlineTransparency)
+	local edge = UIKit.outline(frame, 2, Theme.Style.CardOutlineTransparency)
+	edge.Color = Theme.Style.CardOutline
 	UIKit.shine(0.08).Parent = frame
 	for key, value in props or {} do
 		(frame :: any)[key] = value
@@ -432,6 +434,115 @@ function UIKit.button(text: string, onClick: () -> (), props: Props?): TextButto
 end
 
 --[[
+	Puts an icon in a darker square on the left of a button (reference UI kit
+	look: [icon] Buy). The text shifts right to make room.
+]]
+function UIKit.withIcon(button: TextButton, iconName: string): TextButton
+	local tile = button:FindFirstChild("IconTile") :: Frame?
+	if tile then
+		tile:Destroy()
+	end
+	local holder: Frame = UIKit.new("Frame", {
+		Name = "IconTile",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 5, 0.5, 0),
+		Size = UDim2.new(1, 0, 1, -10),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.8,
+		ZIndex = 3,
+		Active = false,
+		Parent = button,
+	}, {
+		UIKit.corner(UDim.new(0, 8)),
+		UIKit.new("UIAspectRatioConstraint", { AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height }),
+	})
+	local icon = Icons.make(iconName)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	icon.Size = UDim2.fromScale(0.86, 0.86)
+	icon.ZIndex = 4
+	icon.Parent = holder
+	local label = button:FindFirstChild("Label") :: TextLabel?
+	local padding = label and label:FindFirstChildOfClass("UIPadding")
+	if padding then
+		local height = if button.Size.Y.Offset > 0 then button.Size.Y.Offset
+			elseif button.AbsoluteSize.Y > 0 then button.AbsoluteSize.Y
+			else 40
+		padding.PaddingLeft = UDim.new(0, math.floor(height * 0.9) + 2)
+	end
+	return button
+end
+
+--[[
+	The reference UI kit button: a saturated colour with a top-to-bottom
+	gradient, a darker outline in the same hue, a darker "lip" under it (3D
+	look), an icon in a darker square on the left and bold white outlined text.
+	Returns the holder (put this in layouts) and the button.
+]]
+function UIKit.actionButton(text: string, iconName: string?, color: Color3, onClick: () -> (), size: Vector2?): (Frame, TextButton)
+	local s = size or Theme.Size.ActionButton
+	local holder: Frame = UIKit.new("Frame", {
+		Name = text,
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(s.X, s.Y + 5),
+	})
+	UIKit.new("Frame", {
+		Name = "Lip",
+		BackgroundColor3 = Theme.darken(color, 0.42),
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(0, 5),
+		Size = UDim2.fromOffset(s.X, s.Y),
+		ZIndex = 1,
+		Parent = holder,
+	}, {
+		UIKit.corner(UDim.new(0, 12)),
+		UIKit.stroke(Theme.darken(color, 0.6), Theme.Style.OutlineThickness),
+	})
+	local button = UIKit.button(text, onClick, {
+		Name = "Button",
+		BackgroundColor3 = color,
+		Size = UDim2.fromOffset(s.X, s.Y),
+		TextSize = Theme.TextSize.Large - 2,
+		ZIndex = 2,
+		Parent = holder,
+	})
+	local corner = button:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner.CornerRadius = UDim.new(0, 12)
+	end
+	local edge = button:FindFirstChild("Edge") :: UIStroke?
+	if edge then
+		edge.Color = Theme.darken(color, 0.6)
+	end
+	if iconName then
+		UIKit.withIcon(button, iconName)
+	end
+	button:SetAttribute("ActionColor", color)
+	return holder, button
+end
+
+-- Resizes a holder made by UIKit.actionButton (phones use a smaller size).
+function UIKit.setActionSize(holder: Frame, size: Vector2, textSize: number?)
+	holder.Size = UDim2.fromOffset(size.X, size.Y + 5)
+	local lip = holder:FindFirstChild("Lip") :: Frame?
+	if lip then
+		lip.Size = UDim2.fromOffset(size.X, size.Y)
+	end
+	local button = holder:FindFirstChild("Button") :: TextButton?
+	if button then
+		button.Size = UDim2.fromOffset(size.X, size.Y)
+		if textSize then
+			button.TextSize = textSize
+		end
+		local label = button:FindFirstChild("Label") :: TextLabel?
+		local padding = label and label:FindFirstChildOfClass("UIPadding")
+		if padding and button:FindFirstChild("IconTile") then
+			padding.PaddingLeft = UDim.new(0, math.floor(size.Y * 0.9) + 2)
+		end
+	end
+end
+
+--[[
 	Greys a button out (or back in). Disabled buttons still react to a tap
 	with a shake and, if given, a reason toast ("Reach level 3 first!").
 ]]
@@ -557,7 +668,8 @@ end
 -- Tabs
 ---------------------------------------------------------------------------
 
-export type TabItem = { id: string, text: string }
+-- `color` and `icon` (Icons name) give a tab the reference look: its own colour and an icon.
+export type TabItem = { id: string, text: string, color: Color3?, icon: string? }
 export type Tabs = { frame: Frame, select: (id: string, animate: boolean?) -> () }
 
 --[[
@@ -600,6 +712,7 @@ function UIKit.tabs(
 			end
 		end
 		current = id
+		UIKit.paint(highlight, items[index].color or color or Theme.Colors.Primary)
 		local goal = UDim2.new((index - 1) / #items, 4, 0, 4)
 		if animate == false then
 			highlight.Position = goal
@@ -628,6 +741,15 @@ function UIKit.tabs(
 			Parent = frame,
 		})
 		UIKit.outlineText(b, 2)
+		if item.icon then
+			local icon = Icons.make(item.icon)
+			icon.AnchorPoint = Vector2.new(0, 0.5)
+			icon.Position = UDim2.new(0, 10, 0.5, 0)
+			icon.Size = UDim2.fromOffset(28, 28)
+			icon.ZIndex = 4
+			icon.Parent = b
+			UIKit.new("UIPadding", { PaddingLeft = UDim.new(0, 30) }).Parent = b
+		end
 		b.Activated:Connect(function()
 			if current == item.id then
 				return
@@ -680,12 +802,27 @@ function UIKit.panel(
 	UIKit.corner(UDim.new(0, 22)).Parent = panel
 	if not ArtSlot.skin(panel, "PanelFrame") then
 		UIKit.outline(panel, Theme.Style.PanelOutlineThickness)
-		-- Body tinted with the panel's color, fading to cream.
-		UIKit.new("UIGradient", {
-			Name = "Paint",
-			Rotation = 90,
-			Color = ColorSequence.new(Theme.lighten(accent, 0.78), Theme.Colors.Background),
+		-- Dark navy body with a faint tint of the panel's colour (reference UI kit).
+		-- The gradient sits on a child frame: a UIGradient on a CanvasGroup would
+		-- tint everything inside the panel.
+		panel.BackgroundColor3 = Theme.Colors.Background
+		UIKit.new("Frame", {
+			Name = "Fill",
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Active = false,
 			Parent = panel,
+		}, {
+			UIKit.corner(UDim.new(0, 22)),
+			UIKit.new("UIGradient", {
+				Name = "Paint",
+				Rotation = 90,
+				Color = ColorSequence.new(
+					Theme.Colors.Background:Lerp(accent, 0.08),
+					Theme.darken(Theme.Colors.Background, 0.18)
+				),
+			}),
 		})
 	end
 	UIKit.new("UISizeConstraint", { MaxSize = Theme.Size.PanelMax }).Parent = panel
@@ -728,19 +865,30 @@ function UIKit.panel(
 		Parent = header,
 	})
 	UIKit.outlineText(titleLabel, Theme.Style.TitleOutline)
-	local close = UIKit.button("X", onClose, {
+	-- Red Close button with the X icon (reference UI kit).
+	local close = UIKit.button("", onClose, {
 		Name = "Close",
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.fromOffset(44, 44),
+		Size = UDim2.fromOffset(46, 46),
 		BackgroundColor3 = Theme.Colors.Danger,
 		ZIndex = 3,
 		Parent = header,
 	})
 	local closeCorner = close:FindFirstChildOfClass("UICorner")
 	if closeCorner then
-		closeCorner.CornerRadius = Theme.CornerRound
+		closeCorner.CornerRadius = UDim.new(0, 12)
 	end
+	local closeEdge = close:FindFirstChild("Edge") :: UIStroke?
+	if closeEdge then
+		closeEdge.Color = Theme.darken(Theme.Colors.Danger, 0.6)
+	end
+	local closeIcon = Icons.make("Close")
+	closeIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+	closeIcon.Position = UDim2.fromScale(0.5, 0.5)
+	closeIcon.Size = UDim2.fromScale(0.72, 0.72)
+	closeIcon.ZIndex = 4
+	closeIcon.Parent = close
 
 	-- Optional persistent tab bar between header and body.
 	UIKit.new("Frame", {
@@ -845,6 +993,110 @@ function UIKit.row(leftText: string, subText: string?, buttons: { TextButton }, 
 	end
 	buttonHolder.Parent = row
 	return row
+end
+
+-- A wrapping grid of equal cells (item cards) inside a panel body.
+function UIKit.grid(order: number, parent: Instance, cell: Vector2?): Frame
+	local size = cell or Theme.Size.ItemCard
+	return UIKit.new("Frame", {
+		Name = "Grid",
+		BackgroundTransparency = 1,
+		LayoutOrder = order,
+		Size = UDim2.new(1, -8, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = parent,
+	}, {
+		UIKit.new("UIGridLayout", {
+			CellSize = UDim2.fromOffset(size.X, size.Y),
+			CellPadding = UDim2.fromOffset(10, 10),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		}),
+		UIKit.new("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 6) }),
+	})
+end
+
+export type ItemCardOptions = {
+	name: string,
+	icon: GuiObject,
+	sub: string?,
+	button: TextButton?,
+	count: number?,
+	locked: boolean?,
+	order: number?,
+}
+
+--[[
+	An item card for grids: big icon, name, a short line (price, owned...)
+	and an optional action button along the bottom. `count` shows a quantity
+	badge ("x3") in the corner.
+]]
+function UIKit.itemCard(opts: ItemCardOptions): Frame
+	local card = UIKit.card({
+		Name = opts.name,
+		LayoutOrder = opts.order or 0,
+		BackgroundColor3 = if opts.locked then Theme.Colors.SurfaceAlt else Theme.Colors.Surface,
+	})
+	local iconHolder = UIKit.new("Frame", {
+		Name = "IconHolder",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 8),
+		Size = UDim2.new(1, -16, 0, 74),
+		BackgroundColor3 = Theme.Colors.SurfaceAlt,
+		BorderSizePixel = 0,
+		Parent = card,
+	}, { UIKit.corner(Theme.CornerSmall) })
+	local icon = opts.icon
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	icon.Size = UDim2.fromOffset(60, 60)
+	icon.Parent = iconHolder
+	if opts.locked then
+		iconHolder.BackgroundTransparency = 0.3
+	end
+	if opts.count then
+		local count = UIKit.label("x" .. tostring(opts.count), Theme.TextSize.Small + 2, {
+			Name = "Count",
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -6, 1, -4),
+			TextColor3 = Theme.Colors.TextOnPrimary,
+			ZIndex = 3,
+			Parent = iconHolder,
+		})
+		UIKit.outlineText(count, 2)
+	end
+	UIKit.label(opts.name, Theme.TextSize.Body, {
+		Name = "Title",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 86),
+		Size = UDim2.new(1, -12, 0, 22),
+		AutomaticSize = Enum.AutomaticSize.None,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = card,
+	})
+	if opts.sub then
+		UIKit.label(opts.sub, Theme.TextSize.Small, {
+			Name = "Sub",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 108),
+			Size = UDim2.new(1, -12, 0, 18),
+			AutomaticSize = Enum.AutomaticSize.None,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Font = Theme.FontBody,
+			TextColor3 = Theme.Colors.TextMuted,
+			Parent = card,
+		})
+	end
+	if opts.button then
+		local button = opts.button
+		button.AnchorPoint = Vector2.new(0.5, 1)
+		button.Position = UDim2.new(0.5, 0, 1, -8)
+		button.Size = UDim2.new(1, -16, 0, 40)
+		button.Parent = card
+	end
+	return card
 end
 
 -- Section heading inside a panel body.

@@ -38,6 +38,9 @@ Net.Actions = {
 	InviteCoGrower = "InviteCoGrower", -- { userId }
 	RespondCoGrow = "RespondCoGrow", -- { ownerUserId, accept }
 	DebugStartFairDay = "DebugStartFairDay", -- {} Studio only
+	ClaimPlot = "ClaimPlot", -- { slot? } no slot = the server picks a free one
+	UseTool = "UseTool", -- { toolId, ownerUserId, plotId }
+	BuySupply = "BuySupply", -- { supplyId, amount }
 }
 
 -- Feedback event names the server can send. The client maps these to feel presets.
@@ -62,6 +65,11 @@ Net.Feedback = {
 	CoGrowJoined = "CoGrowJoined",
 	ServerPrize = "ServerPrize",
 	MailReceived = "MailReceived",
+	PestsAppeared = "PestsAppeared",
+	PestsRemoved = "PestsRemoved",
+	Fertilized = "Fertilized",
+	-- Sent to everyone in the server so each client can play the tool animation.
+	ToolUsed = "ToolUsed",
 }
 
 return Net

@@ -3,8 +3,10 @@
 	Hud: the always-on screen. Built once, then updated in place (no
 	rebuilds, so nothing jumps or loses its hover state).
 
-	  Top left     coin pill (rolls up, coins fly into it on a sale)
-	               level pill (badge + XP bar, filled by essence via LevelBar)
+	  Top left     coin pill (rolls up, coins fly into it on a sale; + opens the Basket)
+	               gem pill (premium currency: not in the game yet, shown as "Soon")
+	               player card (avatar, name, level badge + XP bar filled by essence via LevelBar)
+	  Left         round nav buttons: Shop, Seeds, Tools, Backpack, Upgrades, Settings
 	  Right        menu buttons with badges (basket count, champion needs care,
 	               fair waiting for an entry, new ribbons)
 	  Bottom       seed hotbar (selected seed lifts up)
@@ -16,6 +18,7 @@
 	Art slots: CoinIcon, LevelIcon, Menu<Panel>, Seed_<cropId> (see Theme.Art).
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -31,22 +34,39 @@ local LevelBar = require(script.Parent.LevelBar)
 local Tweens = require(script.Parent.Parent.Feel.Tweens)
 local EssenceFX = require(script.Parent.Parent.Feel.EssenceFX)
 
+local Icons = require(script.Parent.Icons)
+local ToolBar = require(script.Parent.ToolBar)
+
 local Hud = {}
 
-export type MenuEntry = { panel: string, text: string, glyph: string }
+export type MenuEntry = { panel: string, text: string, icon: string, color: Color3 }
+export type NavEntry = { id: string, panel: string, tab: string?, text: string, icon: string, color: Color3 }
 
+-- Left nav (round buttons). `tab` opens that tab of the panel.
+Hud.NAV = {
+	{ id = "Shop", panel = "Shop", text = "Shop", icon = "Shop", color = Theme.Colors.Danger },
+	{ id = "Seeds", panel = "Shop", tab = "seeds", text = "Seeds", icon = "Seeds", color = Theme.Colors.Primary },
+	{ id = "Tools", panel = "Tools", text = "Tools", icon = "Tools", color = Theme.Colors.Info },
+	{ id = "Backpack", panel = "Backpack", text = "Backpack", icon = "Backpack", color = Theme.Colors.Slate },
+	{ id = "Upgrades", panel = "Shop", tab = "upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
+	{ id = "Settings", panel = "Settings", text = "Settings", icon = "Settings", color = Theme.Colors.Gold },
+} :: { NavEntry }
+
+-- Right menu.
 Hud.MENU = {
-	{ panel = "Shop", text = "Shop", glyph = "S" },
-	{ panel = "Market", text = "Basket", glyph = "B" },
-	{ panel = "Fair", text = "Fairs", glyph = "F" },
-	{ panel = "Champion", text = "Champion", glyph = "C" },
-	{ panel = "Ribbons", text = "Ribbons", glyph = "R" },
+	{ panel = "Market", text = "Basket", icon = "Basket", color = Theme.Colors.Accent },
+	{ panel = "Fair", text = "Fairs", icon = "Trophy", color = Theme.Colors.Gold },
+	{ panel = "Champion", text = "Champion", icon = "Crown", color = Theme.Colors.Purple },
+	{ panel = "Ribbons", text = "Ribbons", icon = "Ribbon", color = Theme.Colors.Danger },
 } :: { MenuEntry }
 
 local root: Frame
 local coinPill: Frame
 local coinCounter: Counter.Counter
 local levelPill: Frame
+local gemPill: Frame
+local nav: Frame
+local navButtons: { [string]: TextButton } = {}
 local menu: Frame
 local seedScroller: ScrollingFrame
 local seedDock: Frame
@@ -56,6 +76,10 @@ local seedSlots: { [string]: { holder: Frame, button: TextButton, count: TextLab
 	{}
 
 local coinPending: number? = nil
+-- True while a garden tool is in hand: the seed highlight dims so only one thing is active.
+local toolActive = false
+local lastData: { [string]: any }? = nil
+local onEarnCoins: () -> () = function() end
 local dockHidden = false
 
 local function cropOrder(): { any }
@@ -85,7 +109,7 @@ local function buildStats()
 		Name = "Stats",
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(16, 14),
-		Size = UDim2.fromOffset(Theme.Size.PillWidth + 20, 110),
+		Size = UDim2.fromOffset(Theme.Size.PillWidth + 20, 172),
 		Parent = root,
 	})
 
@@ -98,14 +122,14 @@ local function buildStats()
 		ZIndex = 2,
 		Parent = stats,
 	}, { UIKit.corner(Theme.CornerRound) })
-	UIKit.paint(coinPill, Theme.Colors.Gold)
+	UIKit.paint(coinPill, Theme.Colors.Primary)
 	UIKit.outline(coinPill)
 	UIKit.gloss(coinPill)
 	UIKit.shadow(coinPill)
 	ArtSlot.icon("CoinIcon", {
 		size = 54,
 		round = true,
-		color = Theme.Colors.Gold,
+		color = Theme.Colors.Primary,
 		glyph = "C",
 		anchor = Vector2.new(0.5, 0.5),
 		position = UDim2.new(0, 0, 0.5, 0),
@@ -129,26 +153,110 @@ local function buildStats()
 		gainColor = Theme.Colors.Gold,
 		tick = "CoinTick",
 	})
+	-- "+": earn coins by selling veggies (opens the Basket).
+	local earn = UIKit.button("+", function()
+		onEarnCoins()
+	end, {
+		Name = "Earn",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -4, 0.5, 0),
+		Size = UDim2.fromOffset(34, 34),
+		BackgroundColor3 = Theme.Colors.PrimaryDark,
+		TextSize = Theme.TextSize.Large,
+		ZIndex = 4,
+		Parent = coinPill,
+	})
+	local earnCorner = earn:FindFirstChildOfClass("UICorner")
+	if earnCorner then
+		earnCorner.CornerRadius = UDim.new(0, 9)
+	end
 
-	-- Level: a badge with the number, and the XP bar.
-	levelPill = UIKit.new("Frame", {
-		Name = "Level",
+	-- Gems: premium currency. Not in the game yet, so the pill says "Soon" and has no + button.
+	gemPill = UIKit.new("Frame", {
+		Name = "Gems",
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(18, 60),
-		Size = UDim2.fromOffset(Theme.Size.PillWidth - 18, 36),
+		Position = UDim2.fromOffset(18, 58),
+		Size = UDim2.fromOffset(Theme.Size.PillWidth - 60, 38),
 		ZIndex = 2,
 		Parent = stats,
 	}, { UIKit.corner(Theme.CornerRound) })
-	UIKit.paint(levelPill, Theme.lighten(Theme.Style.Outline, 0.18))
-	UIKit.outline(levelPill)
-	UIKit.shadow(levelPill)
-	local badge = ArtSlot.icon("LevelIcon", {
-		size = 46,
+	UIKit.paint(gemPill, Theme.Colors.Purple)
+	UIKit.outline(gemPill)
+	UIKit.shadow(gemPill)
+	gemPill:SetAttribute("NotConnected", "Gems are not in the game yet")
+	ArtSlot.icon("GemIcon", {
+		size = 44,
 		round = true,
-		color = Theme.Colors.Primary,
-		glyph = "",
+		color = Theme.Colors.Purple,
+		glyph = "G",
 		anchor = Vector2.new(0.5, 0.5),
 		position = UDim2.new(0, 0, 0.5, 0),
+		zIndex = 3,
+	}).Parent =
+		gemPill
+	local soon = UIKit.label("Soon", Theme.TextSize.Body, {
+		Name = "Amount",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 32, 0.5, 0),
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		ZIndex = 3,
+		Parent = gemPill,
+	})
+	UIKit.outlineText(soon, 2)
+	gemPill.BackgroundTransparency = 0.25
+
+	-- Player card: avatar, name, level badge and the XP bar.
+	levelPill = UIKit.new("Frame", {
+		Name = "Level",
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(4, 106),
+		Size = UDim2.fromOffset(Theme.Size.PillWidth + 12, 60),
+		ZIndex = 2,
+		Parent = stats,
+	}, { UIKit.corner(UDim.new(0, 16)) })
+	UIKit.paint(levelPill, Theme.Colors.Chip)
+	UIKit.outline(levelPill)
+	UIKit.shadow(levelPill)
+	local avatar = UIKit.new("ImageLabel", {
+		Name = "Avatar",
+		Position = UDim2.fromOffset(6, 6),
+		Size = UDim2.fromOffset(48, 48),
+		BackgroundColor3 = Theme.lighten(Theme.Colors.Chip, 0.25),
+		Image = "",
+		ZIndex = 3,
+		Parent = levelPill,
+	}, { UIKit.corner(Theme.CornerRound), UIKit.stroke(Theme.Colors.TextOnPrimary, 2) })
+	task.spawn(function()
+		local ok, image = pcall(function()
+			return Players:GetUserThumbnailAsync(
+				Players.LocalPlayer.UserId,
+				Enum.ThumbnailType.HeadShot,
+				Enum.ThumbnailSize.Size100x100
+			)
+		end)
+		if ok then
+			avatar.Image = image
+		end
+	end)
+	local nameLabel = UIKit.label(Players.LocalPlayer.DisplayName, Theme.TextSize.Body, {
+		Name = "PlayerName",
+		Position = UDim2.fromOffset(62, 5),
+		Size = UDim2.new(1, -110, 0, 22),
+		AutomaticSize = Enum.AutomaticSize.None,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextColor3 = Theme.Colors.TextOnPrimary,
+		ZIndex = 3,
+		Parent = levelPill,
+	})
+	UIKit.outlineText(nameLabel, 2)
+	-- Level number in a gold star badge on the right.
+	local badge = ArtSlot.icon("LevelIcon", {
+		size = 42,
+		round = true,
+		color = Theme.Colors.Gold,
+		glyph = "",
+		anchor = Vector2.new(1, 0.5),
+		position = UDim2.new(1, -6, 0.5, 0),
 		zIndex = 3,
 	})
 	badge.Parent = levelPill
@@ -166,8 +274,8 @@ local function buildStats()
 		Name = "Track",
 		BackgroundColor3 = Theme.darken(Theme.Style.Outline, 0.3),
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(30, 6),
-		Size = UDim2.new(1, -37, 1, -12),
+		Position = UDim2.fromOffset(62, 30),
+		Size = UDim2.new(1, -116, 0, 22),
 		ClipsDescendants = true,
 		Parent = levelPill,
 	}, { UIKit.corner(Theme.CornerRound) })
@@ -192,52 +300,55 @@ local function buildStats()
 	LevelBar.mount(levelPill, fill, xpLabel, levelNumber)
 end
 
+-- Reference-style rectangle buttons: colour + icon square + bold outlined text.
+local navHolders: { Frame } = {}
+local menuHolders: { Frame } = {}
+
+-- Left nav (Shop, Seeds, Tools, Backpack, Upgrades, Settings).
+local function buildNav(onMenu: (panel: string, tab: string?) -> ())
+	nav = UIKit.new("Frame", {
+		Name = "Nav",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(16, 196),
+		Size = UDim2.fromOffset(Theme.Size.ActionButton.X, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = root,
+	}, { UIKit.list(Enum.FillDirection.Vertical, 6) })
+	for i, entry in Hud.NAV do
+		local holder, button = UIKit.actionButton(entry.text, entry.icon, entry.color, function()
+			onMenu(entry.panel, entry.tab)
+		end)
+		holder.Name = entry.id
+		holder.LayoutOrder = i
+		holder.Parent = nav
+		navButtons[entry.id] = button
+		table.insert(navHolders, holder)
+	end
+	-- Badges that target "Shop" land on the nav Shop button (effects via Hud.target).
+	menuBadges.Shop = UIKit.badge(navButtons.Shop)
+end
+
+-- Right menu (Basket, Fairs, Champion, Ribbons) in the same style, with badges.
 local function buildMenu(onMenu: (panel: string) -> ())
 	menu = UIKit.new("Frame", {
 		Name = "Menu",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -16, 0.5, 0),
-		Size = UDim2.fromOffset(Theme.Size.MenuButton, 0),
+		Size = UDim2.fromOffset(Theme.Size.ActionButton.X, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		Parent = root,
-	}, { UIKit.list(Enum.FillDirection.Vertical, 10, Enum.HorizontalAlignment.Right) })
+	}, { UIKit.list(Enum.FillDirection.Vertical, 8, Enum.HorizontalAlignment.Right) })
 	for i, entry in Hud.MENU do
-		local accent = Theme.PanelAccent[entry.panel] or Theme.Colors.Primary
-		local button = UIKit.button("", function()
+		local holder, button = UIKit.actionButton(entry.text, entry.icon, entry.color, function()
 			onMenu(entry.panel)
-		end, {
-			Name = entry.panel,
-			LayoutOrder = i,
-			Size = UDim2.fromOffset(Theme.Size.MenuButton, Theme.Size.MenuButton),
-			BackgroundColor3 = accent,
-		})
-		local corner = button:FindFirstChildOfClass("UICorner")
-		if corner then
-			corner.CornerRadius = UDim.new(0, 18)
-		end
-		ArtSlot.icon("Menu" .. entry.panel, {
-			size = 38,
-			color = Theme.lighten(accent, 0.35),
-			glyph = entry.glyph,
-			anchor = Vector2.new(0.5, 0),
-			position = UDim2.new(0.5, 0, 0, 6),
-			zIndex = 3,
-		}).Parent =
-			button
-		local caption = UIKit.label(entry.text, 14, {
-			Name = "Caption",
-			AnchorPoint = Vector2.new(0.5, 1),
-			Position = UDim2.new(0.5, 0, 1, -3),
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextColor3 = Theme.Colors.TextOnPrimary,
-			ZIndex = 3,
-			Parent = button,
-		})
-		UIKit.outlineText(caption, 2)
-		button.Parent = menu
+		end)
+		holder.Name = entry.panel
+		holder.LayoutOrder = i
+		holder.Parent = menu
 		menuButtons[entry.panel] = button
 		menuBadges[entry.panel] = UIKit.badge(button)
+		table.insert(menuHolders, holder)
 	end
 end
 
@@ -271,16 +382,19 @@ end
 
 local function layoutForDevice()
 	local phone = Scale.isPhone()
-	local menuSize = if phone then Theme.Size.MenuButtonPhone else Theme.Size.MenuButton
-	menu.Size = UDim2.fromOffset(menuSize, 0)
-	for _, button in menuButtons do
-		button.Size = UDim2.fromOffset(menuSize, menuSize)
-		local caption = button:FindFirstChild("Caption") :: TextLabel?
-		if caption then
-			caption.TextSize = if phone then 12 else 14
-		end
+	local buttonSize = if phone then Theme.Size.ActionButtonPhone else Theme.Size.ActionButton
+	local textSize = if phone then Theme.TextSize.Body - 2 else Theme.TextSize.Large - 2
+	for _, holder in navHolders do
+		UIKit.setActionSize(holder, buttonSize, textSize)
 	end
+	for _, holder in menuHolders do
+		UIKit.setActionSize(holder, buttonSize, textSize)
+	end
+	nav.Size = UDim2.fromOffset(buttonSize.X, 0)
+	menu.Size = UDim2.fromOffset(buttonSize.X, 0)
+	local menuSize = buttonSize.X
 	local slotSize = if phone then Theme.Size.SeedSlotPhone else Theme.Size.SeedSlot
+	ToolBar.resize(slotSize)
 	for _, slot in seedSlots do
 		slot.holder.Size = UDim2.fromOffset(slotSize, slotSize + 12)
 		slot.button.Size = UDim2.fromOffset(slotSize, slotSize)
@@ -311,7 +425,7 @@ local function setSlotSelected(cropId: string, selected: boolean)
 		Color = if selected then Theme.Colors.Gold else Theme.Style.Outline,
 		Thickness = if selected then 5 else Theme.Style.OutlineThickness,
 	})
-	UIKit.paint(slot.button, if selected then Theme.lighten(Theme.Colors.Gold, 0.65) else Theme.Colors.Surface)
+	UIKit.paint(slot.button, if selected then Theme.darken(Theme.Colors.Gold, 0.15) else Theme.Colors.Surface)
 	if selected then
 		Tweens.pop(slot.button, 0.12)
 		Tweens.flash(slot.button, Theme.Style.Flash, 0.3)
@@ -389,7 +503,7 @@ local function renderSeeds(data: { [string]: any })
 		else
 			UIKit.setBadge(badge, count)
 		end
-		setSlotSelected(crop.id, data.selectedSeed == crop.id)
+		setSlotSelected(crop.id, data.selectedSeed == crop.id and not toolActive)
 	end
 end
 
@@ -397,7 +511,10 @@ end
 -- Public
 ---------------------------------------------------------------------------
 
-function Hud.build(playerGui: Instance, onMenu: (panel: string) -> (), onSeed: (cropId: string) -> ())
+function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) -> (), onSeed: (cropId: string) -> ())
+	onEarnCoins = function()
+		onMenu("Market")
+	end
 	local gui = UIKit.new("ScreenGui", {
 		Name = "GVF_UI",
 		ResetOnSpawn = false,
@@ -417,17 +534,32 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string) -> (), onSeed: (
 	Toasts.mount(Scale.root(toastGui, "Toasts"))
 
 	buildStats()
+	buildNav(onMenu)
 	buildMenu(onMenu)
 	buildSeedDock()
-	for i, crop in cropOrder() do
-		makeSeedSlot(crop, i, onSeed)
+	-- Picking a seed puts any garden tool away.
+	local function selectSeed(cropId: string)
+		ToolBar.unequip()
+		onSeed(cropId)
 	end
+	for i, crop in cropOrder() do
+		makeSeedSlot(crop, i, selectSeed)
+	end
+	ToolBar.mount(seedScroller)
+	ToolBar.Changed:Connect(function(toolId)
+		toolActive = toolId ~= nil
+		if lastData then
+			renderSeeds(lastData)
+		end
+	end)
 	layoutForDevice()
 	Scale.Changed:Connect(layoutForDevice)
 	root:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutForDevice)
 end
 
 function Hud.render(data: { [string]: any })
+	lastData = data
+	ToolBar.render(data)
 	Hud.setCoins(data.coins)
 	LevelBar.setTarget(data.level, data.xp, data.xpToNext or 1)
 	renderSeeds(data)
@@ -494,8 +626,10 @@ function Hud.target(name: string): GuiObject?
 		return levelPill
 	elseif name == "Seeds" then
 		return seedDock
+	elseif name == "Gems" then
+		return gemPill
 	end
-	return menuButtons[name]
+	return menuButtons[name] or navButtons[name]
 end
 
 -- Slides the seed hotbar away while a panel is open, so the panel has the stage.

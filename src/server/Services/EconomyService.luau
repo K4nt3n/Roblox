@@ -37,6 +37,9 @@ function EconomyService:Start()
 	NetService:Handle(Net.Actions.SellAll, function(player)
 		return self:SellAll(player)
 	end)
+	NetService:Handle(Net.Actions.BuySupply, function(player, payload)
+		return self:BuySupply(player, payload.supplyId, payload.amount)
+	end)
 
 	-- Computed values the UI needs, so the client never duplicates pricing rules.
 	NetService:AddSnapshotBuilder(function(player, snapshot)
@@ -67,6 +70,7 @@ function EconomyService:Start()
 			end
 		end
 		snapshot.producePrices = prices
+		snapshot.supplies = data.supplies
 	end)
 end
 
@@ -133,6 +137,25 @@ function EconomyService:BuySeed(player: Player, cropId: any, amount: any): (bool
 	end
 	data.seeds[cropId] = (data.seeds[cropId] or 0) + count
 	Services.NetService:Feedback(player, Net.Feedback.Purchased, { kind = "Seed", cropId = cropId, amount = count })
+	Services.DataService:MarkDirty(player)
+	return true, nil
+end
+
+function EconomyService:BuySupply(player: Player, supplyId: any, amount: any): (boolean, any)
+	local data = Services.DataService:Get(player)
+	if not data then
+		return false, "NotLoaded"
+	end
+	local def = type(supplyId) == "string" and Config.Supplies[supplyId]
+	if not def then
+		return false, "UnknownSupply"
+	end
+	local count = if type(amount) == "number" then math.clamp(math.floor(amount), 1, 99) else 1
+	if not self:TrySpend(player, def.cost * count) then
+		return false, "NotEnoughCoins"
+	end
+	data.supplies[supplyId] = (data.supplies[supplyId] or 0) + count
+	Services.NetService:Feedback(player, Net.Feedback.Purchased, { kind = "Supply", supplyId = supplyId, amount = count })
 	Services.DataService:MarkDirty(player)
 	return true, nil
 end

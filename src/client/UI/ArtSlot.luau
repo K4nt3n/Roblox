@@ -4,8 +4,9 @@
 
 	    ArtSlot.icon("CoinIcon", { size = 40, color = Theme.Colors.Gold, glyph = "C" })
 
-	If Theme.Art[slot] has an asset id, an ImageLabel is drawn. Otherwise a
-	flat placeholder shape (rounded square or circle, with a short glyph) is
+	If Theme.Art[slot] has an asset id, an ImageLabel is drawn. Otherwise, if
+	UI/Icons knows the slot, that icon is drawn (its image or emoji). Otherwise
+	a flat placeholder shape (rounded square or circle, with a short glyph) is
 	drawn in the same box, so swapping art never moves anything.
 
 	Every slot instance is named "Art_<slot>" and carries an "ArtSlot"
@@ -16,6 +17,7 @@
 local RunService = game:GetService("RunService")
 
 local Theme = require(script.Parent.Theme)
+local Icons = require(script.Parent.Icons)
 
 local ArtSlot = {}
 
@@ -48,6 +50,7 @@ function ArtSlot.icon(slot: string, options: IconOptions?): GuiObject
 	local opts = options or {}
 	local size = opts.size or 36
 	local asset = ArtSlot.asset(slot)
+	local iconName = if asset then nil else Icons.forSlot(slot)
 	local gui: GuiObject
 	if asset then
 		local image = Instance.new("ImageLabel")
@@ -55,6 +58,13 @@ function ArtSlot.icon(slot: string, options: IconOptions?): GuiObject
 		image.Image = asset
 		image.ScaleType = Enum.ScaleType.Fit
 		gui = image
+	elseif iconName then
+		local holder = Instance.new("Frame")
+		holder.BackgroundTransparency = 1
+		local icon = Icons.make(iconName)
+		icon.Size = UDim2.fromScale(1, 1)
+		icon.Parent = holder
+		gui = holder
 	else
 		local frame = Instance.new("Frame")
 		local color = opts.color or Theme.Colors.SurfaceAlt

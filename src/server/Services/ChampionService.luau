@@ -153,8 +153,8 @@ function ChampionService:Care(player: Player, owner: Player, plotId: string): (b
 		return false, "NoCareNeeded"
 	end
 	if need.kind == "Water" then
-		-- Water needs go through the normal watering rules (cooldown, boost).
-		return Services.GardenService:Water(player, owner, plotId)
+		-- Water needs are answered with the Watering Bucket (ToolService -> GardenService:Water).
+		return false, "UseBucket"
 	end
 	local credit = self:_credit(player, owner, plant, need)
 	Services.PlotService:SyncPlot(owner, plotId, plant, false)
