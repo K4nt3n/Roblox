@@ -476,8 +476,8 @@ end
 
 --[[
 	The reference UI kit button: a saturated colour with a top-to-bottom
-	gradient, a darker outline in the same hue, a darker "lip" under it (3D
-	look), an icon in a darker square on the left and bold white outlined text.
+	gradient, a darker outline in the same hue, an icon in a darker square
+	on the left and bold white outlined text.
 	Returns the holder (put this in layouts) and the button.
 ]]
 function UIKit.actionButton(text: string, iconName: string?, color: Color3, onClick: () -> (), size: Vector2?): (Frame, TextButton)
@@ -485,19 +485,9 @@ function UIKit.actionButton(text: string, iconName: string?, color: Color3, onCl
 	local holder: Frame = UIKit.new("Frame", {
 		Name = text,
 		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(s.X, s.Y + 5),
-	})
-	UIKit.new("Frame", {
-		Name = "Lip",
-		BackgroundColor3 = Theme.darken(color, 0.42),
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(0, 5),
+		-- No darker "lip" underneath: it stayed put while the button scaled on hover/press,
+		-- so it read as a second button behind the first.
 		Size = UDim2.fromOffset(s.X, s.Y),
-		ZIndex = 1,
-		Parent = holder,
-	}, {
-		UIKit.corner(UDim.new(0, 12)),
-		UIKit.stroke(Theme.darken(color, 0.6), Theme.Style.OutlineThickness),
 	})
 	local button = UIKit.button(text, onClick, {
 		Name = "Button",
@@ -524,11 +514,7 @@ end
 
 -- Resizes a holder made by UIKit.actionButton (phones use a smaller size).
 function UIKit.setActionSize(holder: Frame, size: Vector2, textSize: number?)
-	holder.Size = UDim2.fromOffset(size.X, size.Y + 5)
-	local lip = holder:FindFirstChild("Lip") :: Frame?
-	if lip then
-		lip.Size = UDim2.fromOffset(size.X, size.Y)
-	end
+	holder.Size = UDim2.fromOffset(size.X, size.Y)
 	local button = holder:FindFirstChild("Button") :: TextButton?
 	if button then
 		button.Size = UDim2.fromOffset(size.X, size.Y)
