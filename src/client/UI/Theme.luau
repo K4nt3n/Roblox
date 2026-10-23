@@ -140,8 +140,12 @@ Theme.Size = {
 	-- Wide left-side HUD buttons (Backpack, Upgrades, Fairs, Champion).
 	SideButton = Vector2.new(190, 54),
 	SideButtonPhone = Vector2.new(140, 42),
-	SeedSlot = 76,
-	SeedSlotPhone = 64,
+	-- Hotbar slots (seeds and garden tools).
+	SeedSlot = 62,
+	SeedSlotPhone = 52,
+	-- Room above a hotbar slot for its badge and the lift when selected, so nothing is clipped.
+	SlotHeadroom = 22,
+	SlotLift = 8,
 	PillWidth = 220,
 	PanelMax = Vector2.new(700, 540),
 	ModalWidth = 440,

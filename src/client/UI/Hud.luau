@@ -94,7 +94,7 @@ local TOP_GAP = 4
 local STATS_WIDTH = Theme.Size.PillWidth + 20
 local STATS_HEIGHT = 172
 -- Share of a hotbar slot the seed icon fills.
-local ICON_SCALE = 0.72
+local ICON_SCALE = 0.68
 
 local function cropOrder(): { any }
 	local list = {}
@@ -465,7 +465,7 @@ local function layoutForDevice()
 	ToolBar.resize(slotSize)
 	FairTimers.layout(phone)
 	for _, slot in seedSlots do
-		slot.holder.Size = UDim2.fromOffset(slotSize, slotSize + 12)
+		slot.holder.Size = UDim2.fromOffset(slotSize, slotSize + Theme.Size.SlotHeadroom + 4)
 		slot.button.Size = UDim2.fromOffset(slotSize, slotSize)
 		if slot.shadow then
 			slot.shadow.Size = slot.button.Size
@@ -474,7 +474,7 @@ local function layoutForDevice()
 	-- Keep the hotbar clear of the stats in the corner and, on touch screens, the thumbstick and jump button.
 	local rootWidth = root.AbsoluteSize.X / math.max(Scale.value, 0.01)
 	local margin = if phone then 170 else (STATS_WIDTH + 32) * 2
-	seedDock.Size = UDim2.fromOffset(math.max(240, rootWidth - margin), slotSize + 20)
+	seedDock.Size = UDim2.fromOffset(math.max(240, rootWidth - margin), slotSize + Theme.Size.SlotHeadroom + 4 + 6)
 end
 
 ---------------------------------------------------------------------------
@@ -488,7 +488,7 @@ local function setSlotSelected(cropId: string, selected: boolean)
 	end
 	slot.selected = selected
 	Tweens.play(slot.button, Tweens.Ease.PanelIn, {
-		Position = UDim2.new(0.5, 0, 1, if selected then -16 else -6),
+		Position = UDim2.new(0.5, 0, 1, if selected then -4 - Theme.Size.SlotLift else -4),
 	})
 	Tweens.play(slot.edge, Tweens.Ease.Hover, {
 		Color = if selected then Theme.Colors.Gold else Theme.Style.Outline,
@@ -507,7 +507,7 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 		Name = crop.id,
 		BackgroundTransparency = 1,
 		LayoutOrder = order,
-		Size = UDim2.fromOffset(size, size + 12),
+		Size = UDim2.fromOffset(size, size + Theme.Size.SlotHeadroom + 4),
 		Visible = false,
 		Parent = seedScroller,
 	})
@@ -516,7 +516,7 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 	end, {
 		Name = "Slot",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -6),
+		Position = UDim2.new(0.5, 0, 1, -4),
 		Size = UDim2.fromOffset(size, size),
 		BackgroundColor3 = Theme.Colors.Surface,
 		Parent = holder,
@@ -537,7 +537,7 @@ local function makeSeedSlot(crop: any, order: number, onSelect: (cropId: string)
 	UIKit.label(crop.displayName, 13, {
 		Name = "Name",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -5),
+		Position = UDim2.new(0.5, 0, 1, -4),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		ZIndex = 4, -- over the icon
 		Parent = button,
