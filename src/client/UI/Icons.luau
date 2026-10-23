@@ -146,7 +146,8 @@ local IMAGES: { [string]: string } = {
 	Rewards = "rbxassetid://100782637837673",
 	Profile = "rbxassetid://77420709122744",
 	Trophy = "rbxassetid://106798587561921",
-	Crown = "rbxassetid://125161749903030",
+	-- Crown: the uploaded image (rbxassetid://125161749903030) was too low resolution, so the
+	-- crisp 👑 emoji is used until a sharper image id goes here.
 	Success = "rbxassetid://109300110129433",
 	Info = "rbxassetid://127303904167870",
 	Error = "rbxassetid://90461792057933",
