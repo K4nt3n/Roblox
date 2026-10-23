@@ -95,7 +95,7 @@ function ChampionPanel.render(body: ScrollingFrame, data: { [string]: any })
 	local state = if crop then GrowthMath.evaluate(plant, crop, Config, now) else nil
 	local title = if plant.name then string.format("%s the %s", plant.name, crop and crop.displayName or "") else (crop and crop.displayName or "Champion")
 	local c = crop and crop.placeholderColor
-	ArtSlot.icon("ChampionPortrait", {
+	ArtSlot.icon("Seed_" .. plant.cropId, {
 		size = 96,
 		round = true,
 		color = if c then Color3.fromRGB(c[1], c[2], c[3]) else Theme.Colors.Purple,
