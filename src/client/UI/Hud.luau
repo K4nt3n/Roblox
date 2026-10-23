@@ -675,7 +675,7 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 		TextTransparency = 1,
 		Parent = seedDock,
 	})
-	UIKit.outlineText(heldName, Theme.Style.TitleOutline, true)
+	UIKit.outlineText(heldName, 2, true)
 	ContextActionService:BindAction("GVF_SeedKeys", function(_, state, input)
 		if state ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass

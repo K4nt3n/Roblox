@@ -102,7 +102,7 @@ function FairTimers.mount(parent: Instance, onOpen: (fair: string) -> ())
 			TextColor3 = if style then style.color else Theme.Colors.Text,
 			Parent = button,
 		})
-		UIKit.outlineText(label, Theme.Style.TitleOutline, true)
+		UIKit.outlineText(label, 2, true)
 		button.Activated:Connect(function()
 			FeelController.play("ButtonPress")
 			Tweens.pop(button, 0.1)
