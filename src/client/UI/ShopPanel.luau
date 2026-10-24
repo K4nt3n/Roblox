@@ -1,8 +1,8 @@
 --!strict
 --[[
-	ShopPanel: seeds (+ supplies like fertilizer bags) and the garden (plots +
-	honest skip-the-wait), one tab each. Opened from the Seed Shop stand in the
-	middle of the map. Upgrades are their own HUD panel (ShopPanel.renderUpgrades).
+	ShopPanel: seeds and supplies (like fertilizer bags), one tab each, as lists.
+	Opened from the Seed Shop stand in the middle of the map. New plots are bought
+	at the plot itself. Upgrades are their own HUD panel (ShopPanel.renderUpgrades).
 	Every price comes from the server snapshot or Config.
 
 	Buttons that can't be used yet stay visible but greyed out, and tapping
@@ -10,15 +10,11 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Format = require(Shared.Format)
-local GrowthMath = require(Shared.GrowthMath)
 local Net = require(Shared.Net)
-local ClientState = require(script.Parent.Parent.ClientState)
-local NetClient = require(script.Parent.Parent.NetClient)
 local Theme = require(script.Parent.Theme)
 local UIKit = require(script.Parent.UIKit)
 local ArtSlot = require(script.Parent.ArtSlot)
@@ -28,7 +24,6 @@ local ShopPanel = {}
 ShopPanel.TABS = {
 	{ id = "seeds", text = "Seeds", icon = "Seeds", color = Theme.Colors.Primary },
 	{ id = "supplies", text = "Supplies", icon = "Tools", color = Theme.Colors.Info },
-	{ id = "garden", text = "Garden", icon = "Fence", color = Theme.Colors.Gold },
 } :: { UIKit.TabItem }
 
 local NOT_ENOUGH = "Not enough Coins yet!"
@@ -53,69 +48,64 @@ local function seedIcon(crop: any): GuiObject
 	})
 end
 
--- Small "x5" quick-buy button in the corner of an item card's icon.
-local function addBuyFive(card: Frame, action: string, payload: { [string]: any }, enabled: boolean, reason: string)
-	local holder = card:FindFirstChild("IconHolder") :: Frame?
-	if not holder then
-		return
-	end
-	local five = UIKit.requestButton("x5", action, payload, {
-		Name = "BuyFive",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -4, 0, 4),
-		Size = UDim2.fromOffset(44, 30),
-		TextSize = Theme.TextSize.Small,
-		BackgroundColor3 = Theme.Colors.Accent,
-		ZIndex = 4,
-	})
-	UIKit.setEnabled(five, enabled, nil, reason)
-	five.Parent = holder
+-- One shop line: icon, name, info, then "x5" and the single Buy button.
+local function shopRow(
+	name: string,
+	sub: string,
+	icon: GuiObject,
+	action: string,
+	payload: { [string]: any },
+	price: string,
+	canOne: boolean,
+	canFive: boolean,
+	reason: string,
+	order: number
+)
+	local five = UIKit.requestButton("x5", action, table.clone(payload), { BackgroundColor3 = Theme.Colors.Accent })
+	UIKit.setEnabled(five, canFive, nil, reason)
+	local onePayload = table.clone(payload)
+	onePayload.amount = 1
+	local buy = UIKit.requestButton(price, action, onePayload, { BackgroundColor3 = Theme.Colors.Primary })
+	UIKit.withIcon(buy, "Coins")
+	UIKit.setEnabled(buy, canOne, nil, reason)
+	local row = UIKit.row(name, sub, { five, buy }, icon)
+	row.LayoutOrder = order
+	return row
 end
 
--- Seeds as item cards: icon, name, grow time / owned, Buy button (green = buy).
+-- Seeds, one line each: icon, name, grow time and how many you own, buy 5 / buy 1.
 local function renderSeeds(body: ScrollingFrame, data: { [string]: any })
-	local grid = UIKit.grid(1, body)
 	for i, crop in cropOrder() do
 		local locked = data.level < crop.unlockLevel
 		local owned = data.seeds[crop.id] or 0
 		local free = crop.seedCost == 0
 		local sub = if locked
 			then "Unlocks at level " .. crop.unlockLevel
-			else string.format("%s · Own %s", Format.duration(crop.growSeconds), if free then "∞" else tostring(owned))
-		local lockedReason = "Reach level " .. crop.unlockLevel .. " first!"
-		local buy = UIKit.requestButton(
-			if free then "Free" else Format.coins(crop.seedCost),
-			Net.Actions.BuySeed,
-			{ cropId = crop.id, amount = 1 },
-			{ BackgroundColor3 = Theme.Colors.Primary }
-		)
-		if not free then
-			UIKit.withIcon(buy, "Coins")
-		end
-		UIKit.setEnabled(
-			buy,
-			not locked and not free and data.coins >= crop.seedCost,
-			nil,
-			if locked then lockedReason elseif free then "Carrots are always free!" else NOT_ENOUGH
-		)
-		local card = UIKit.itemCard({
-			name = crop.displayName,
-			icon = seedIcon(crop),
-			sub = sub,
-			button = buy,
-			locked = locked,
-			order = i,
-		})
-		if not free then
-			addBuyFive(
-				card,
-				Net.Actions.BuySeed,
-				{ cropId = crop.id, amount = 5 },
-				not locked and data.coins >= crop.seedCost * 5,
-				if locked then lockedReason else NOT_ENOUGH
+			else string.format(
+				"%s · Own %s",
+				Format.duration(crop.growSeconds),
+				if free then "∞" else tostring(owned)
 			)
+		if free then
+			-- Free seeds never run out, so there is nothing to buy.
+			local row = UIKit.row(crop.displayName, sub .. " · Always free", {}, seedIcon(crop))
+			row.LayoutOrder = i
+			row.Parent = body
+			continue
 		end
-		card.Parent = grid
+		shopRow(
+			crop.displayName,
+			sub,
+			seedIcon(crop),
+			Net.Actions.BuySeed,
+			{ cropId = crop.id, amount = 5 },
+			Format.coins(crop.seedCost),
+			not locked and data.coins >= crop.seedCost,
+			not locked and data.coins >= crop.seedCost * 5,
+			if locked then "Reach level " .. crop.unlockLevel .. " first!" else NOT_ENOUGH,
+			i
+		).Parent =
+			body
 	end
 end
 
@@ -128,30 +118,30 @@ local function renderSupplies(body: ScrollingFrame, data: { [string]: any })
 	table.sort(supplyIds, function(a, b)
 		return Config.Supplies[a].order < Config.Supplies[b].order
 	end)
-	local grid = UIKit.grid(1, body)
 	for i, id in supplyIds do
 		local def = Config.Supplies[id]
 		local owned = if data.supplies then data.supplies[id] or 0 else 0
-		local buy = UIKit.requestButton(Format.coins(def.cost), Net.Actions.BuySupply, { supplyId = id, amount = 1 })
-		UIKit.withIcon(buy, "Coins")
-		UIKit.setEnabled(buy, data.coins >= def.cost, nil, NOT_ENOUGH)
-		local card = UIKit.itemCard({
-			name = def.displayName,
-			icon = ArtSlot.icon("Supply_" .. id, { color = Theme.Colors.Primary, glyph = string.sub(def.displayName, 1, 1) }),
-			sub = "You have " .. owned,
-			button = buy,
-			count = owned,
-			order = i,
-		})
-		addBuyFive(card, Net.Actions.BuySupply, { supplyId = id, amount = 5 }, data.coins >= def.cost * 5, NOT_ENOUGH)
-		card.Parent = grid
+		shopRow(
+			def.displayName,
+			"You have " .. owned,
+			ArtSlot.icon("Supply_" .. id, { color = Theme.Colors.Primary, glyph = string.sub(def.displayName, 1, 1) }),
+			Net.Actions.BuySupply,
+			{ supplyId = id, amount = 5 },
+			Format.coins(def.cost),
+			data.coins >= def.cost,
+			data.coins >= def.cost * 5,
+			NOT_ENOUGH,
+			i
+		).Parent =
+			body
 	end
 	UIKit.paragraph("Equip a garden tool from your hotbar or Backpack > Supplies, then tap a plant to use it.", {
-		LayoutOrder = 2,
+		LayoutOrder = #supplyIds + 1,
 		TextSize = Theme.TextSize.Small,
 		TextColor3 = Theme.Colors.TextMuted,
 		Size = UDim2.new(1, -8, 0, 0),
-	}).Parent = body
+	}).Parent =
+		body
 end
 
 local function renderUpgrades(body: ScrollingFrame, data: { [string]: any })
@@ -185,117 +175,12 @@ local function renderUpgrades(body: ScrollingFrame, data: { [string]: any })
 	end
 end
 
-local function renderGarden(body: ScrollingFrame, data: { [string]: any })
-	local order = 0
-	local function nextOrder()
-		order += 1
-		return order
-	end
-
-	local plotButton =
-		UIKit.requestButton(if data.nextPlotCost then Format.coins(data.nextPlotCost) else "MAX", Net.Actions.BuyPlot)
-	UIKit.setEnabled(
-		plotButton,
-		data.nextPlotCost ~= nil and data.coins >= data.nextPlotCost,
-		nil,
-		if data.nextPlotCost then NOT_ENOUGH else "Your garden is full size!"
-	)
-	local plotRow = UIKit.row(
-		"New Plot",
-		string.format("You own %d of %d", data.ownedPlots, Config.Plots.maxPlots),
-		{ plotButton },
-		ArtSlot.icon("Upgrade_plot", { color = Theme.Colors.Primary, glyph = "+" })
-	)
-	plotRow.LayoutOrder = nextOrder()
-	plotRow.Parent = body
-
-	-- Skip-the-wait (developer product) for anything still growing. The shop is
-	-- honest about what a skip costs your champion.
-	UIKit.section("Skip the wait", nextOrder(), body)
-	UIKit.paragraph(
-		string.format(
-			"Champion skips left this week: %d. A skipped champion can't win Natural Grown, and care still beats skips.",
-			data.championSkipsLeft or 0
-		),
-		{
-			LayoutOrder = nextOrder(),
-			TextSize = Theme.TextSize.Small,
-			TextColor3 = Theme.Colors.TextMuted,
-			Size = UDim2.new(1, -8, 0, 0),
-		}
-	).Parent =
-		body
-	local now = ClientState.now()
-	local plotIds = {}
-	for plotId in data.plots do
-		table.insert(plotIds, plotId)
-	end
-	table.sort(plotIds, function(a, b)
-		return (tonumber(a) or 0) < (tonumber(b) or 0)
-	end)
-	local any = false
-	for _, plotId in plotIds do
-		local plant = data.plots[plotId]
-		local crop = Config.Crops[plant.cropId]
-		if crop then
-			local state = GrowthMath.evaluate(plant, crop, Config, now)
-			local isChampion = plant.champion == true
-			if not state.canHarvest then
-				any = true
-				local skip = UIKit.button("Skip", function()
-					task.spawn(function()
-						local result = NetClient.request(Net.Actions.PromptSkip, { plotId = plotId })
-						if not result.ok and result.err == "ProductNotConfigured" and RunService:IsStudio() then
-							-- Stub product: simulate the purchase in Studio so the loop is testable.
-							NetClient.request(
-								Net.Actions.DebugSimulatePurchase,
-								{ product = "SkipGrowth", plotId = plotId }
-							)
-						end
-					end)
-				end, { BackgroundColor3 = Theme.Colors.Gold })
-				if isChampion then
-					UIKit.setEnabled(
-						skip,
-						(data.championSkipsLeft or 0) > 0,
-						nil,
-						"Champions can only be skipped once a week. Care for it instead!"
-					)
-				end
-				local row = UIKit.row(
-					if isChampion
-						then "Champion · " .. crop.displayName
-						else string.format("Plot %s · %s", plotId, crop.displayName),
-					"Ripe in "
-						.. Format.duration(state.secondsToRipe)
-						.. (
-							if isChampion and (plant.paidSkips or 0) == 0 then " · skipping ends Natural Grown" else ""
-						),
-					{ skip },
-					seedIcon(crop)
-				)
-				row.LayoutOrder = nextOrder()
-				row.Parent = body
-			end
-		end
-	end
-	if not any then
-		UIKit.paragraph("Nothing is growing right now. Plant something!", {
-			LayoutOrder = nextOrder(),
-			TextColor3 = Theme.Colors.TextMuted,
-		}).Parent =
-			body
-	end
-end
-
 -- The Upgrades panel (its own HUD button, not a Shop tab).
 ShopPanel.renderUpgrades = renderUpgrades
 
 function ShopPanel.render(body: ScrollingFrame, data: { [string]: any }, tab: string?)
 	if tab == "supplies" then
 		renderSupplies(body, data)
-	elseif tab == "garden" then
-		renderGarden(body, data)
 	else
 		renderSeeds(body, data)
 	end

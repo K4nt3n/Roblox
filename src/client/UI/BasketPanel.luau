@@ -22,6 +22,17 @@ local BasketPanel = {}
 -- Remembered between renders so the worth counter rolls from the last value.
 local lastWorth = 0
 
+-- Marks a row with a coloured edge. The panel is dark, so no light fill behind white text.
+local function highlight(row: Frame, color: Color3)
+	row.BackgroundColor3 = Theme.Colors.SurfaceAlt
+	local edge = row:FindFirstChild("Edge") :: UIStroke?
+	if edge then
+		edge.Color = color
+		edge.Transparency = 0
+		edge.Thickness = 3
+	end
+end
+
 function BasketPanel.render(body: ScrollingFrame, data: { [string]: any })
 	local total = 0
 	for _, price in data.producePrices or {} do
@@ -41,7 +52,7 @@ function BasketPanel.render(body: ScrollingFrame, data: { [string]: any })
 		ArtSlot.icon("MenuMarket", { color = Theme.Colors.Accent, glyph = "B" })
 	)
 	header.LayoutOrder = 0
-	header.BackgroundColor3 = Theme.lighten(Theme.Colors.Accent, 0.82)
+	highlight(header, Theme.Colors.Accent)
 	header.Parent = body
 	local worthLabel = header:FindFirstChild("Sub", true) :: TextLabel?
 	if worthLabel then
@@ -96,7 +107,7 @@ function BasketPanel.render(body: ScrollingFrame, data: { [string]: any })
 		)
 		row.LayoutOrder = i
 		if item.isChampion or item.isGiant then
-			row.BackgroundColor3 = Theme.lighten(Theme.Colors.Gold, 0.75)
+			highlight(row, Theme.Colors.Gold)
 		end
 		row.Parent = body
 	end
