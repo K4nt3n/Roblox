@@ -343,15 +343,36 @@ local function iconButton(entry: NavEntry, onMenu: (panel: string, tab: string?)
 	return holder, button
 end
 
--- Red rounded-square "!" badge sitting on the top right corner (reference HUD look).
+-- Round red "!" badge on the top right corner that keeps pulsing while it shows,
+-- so a waiting reward is hard to miss.
+local BADGE_SIZE = 26
 local function cornerBadge(button: TextButton): Frame
 	local badge = UIKit.badge(button)
 	badge.AnchorPoint = Vector2.new(0.5, 0.5)
 	badge.Position = UDim2.new(1, -4, 0, 2)
-	local round = badge:FindFirstChildOfClass("UICorner")
-	if round then
-		round.CornerRadius = UDim.new(0, 6)
+	-- A fixed square with a full round corner is a perfect circle ("!" is one character).
+	badge.AutomaticSize = Enum.AutomaticSize.None
+	badge.Size = UDim2.fromOffset(BADGE_SIZE, BADGE_SIZE)
+	local padding = badge:FindFirstChildOfClass("UIPadding")
+	if padding then
+		padding:Destroy()
 	end
+	local scale = Tweens.getScale(badge)
+	local grow = TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+	local shrink = TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+	task.spawn(function()
+		while badge.Parent do
+			if badge.Visible then
+				Tweens.play(scale, grow, { Scale = 1.3 })
+				task.wait(0.35)
+				Tweens.play(scale, shrink, { Scale = 1 })
+				task.wait(0.35 + 0.5)
+			else
+				scale.Scale = 1
+				task.wait(0.25)
+			end
+		end
+	end)
 	return badge
 end
 
@@ -385,6 +406,14 @@ local function fitSideLabel(holder: Frame, size: Vector2, textSize: number)
 	local padding = label and label:FindFirstChildOfClass("UIPadding")
 	if padding then
 		padding.PaddingLeft = UDim.new(0, math.floor(size.Y * SIDE_ICON_SCALE / 2) + 8)
+	end
+	-- One line, shrunk to fit: a wrapped second line pushed the name off centre.
+	if label then
+		label.TextWrapped = false
+		label.TextScaled = true
+		local limit = label:FindFirstChildOfClass("UITextSizeConstraint")
+			or UIKit.new("UITextSizeConstraint", { Parent = label })
+		limit.MaxTextSize = textSize
 	end
 end
 
