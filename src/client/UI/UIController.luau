@@ -53,6 +53,8 @@ local PromptUI = require(script.Parent.PromptUI)
 local FairPanel = require(script.Parent.FairPanel)
 local ChampionPanel = require(script.Parent.ChampionPanel)
 local RibbonNames = require(script.Parent.RibbonNames)
+local QuestsPanel = require(script.Parent.QuestsPanel)
+local ComboPopup = require(script.Parent.ComboPopup)
 
 local UIController = {}
 
@@ -100,6 +102,9 @@ local REASONS: { [string]: string } = {
 	NotYourPlot = "You can only fertilize your own plants.",
 	UseBucket = "Equip the Watering Bucket and click the plant to water it!",
 	ClickCrop = "Click the crop you want to water.",
+	AlreadyClaimed = "Already claimed!",
+	QuestNotDone = "Finish the quest first!",
+	NeedMoreStars = "Get more stars to open that chest!",
 }
 
 local CARE_DONE: { [string]: string } = {
@@ -443,6 +448,13 @@ local function registerBuiltIns()
 		render = SettingsPanel.render,
 	})
 	BackpackPanel.close = UIController.close
+	UIController.registerPanel("Quests", {
+		title = "Quests",
+		glyph = "Q",
+		tabs = QuestsPanel.TABS,
+		defaultTab = "daily",
+		render = QuestsPanel.render,
+	})
 	ToolsPanel.close = UIController.close
 	SettingsPanel.refresh = function()
 		renderPanel("Settings", true)
@@ -519,11 +531,35 @@ local function updateBadges()
 	end
 	local looking = openPanel == "Backpack" and panels.Backpack and panels.Backpack.tab == "ribbons"
 	Hud.setBadge("Backpack", if looking then false else total - (seenRibbons :: number))
+
+	-- Quests: login reward, finished quests and star chests waiting to be claimed.
+	local claimable = data.rewards and data.rewards.claimable or 0
+	Hud.setBadge("Quests", if claimable > 0 then claimable else false)
 end
+
+-- The daily login card shows once per session, shortly after the first snapshot.
+local streakShown = false
+local function maybeShowStreak(data: { [string]: any })
+	if streakShown or not (data.rewards and data.rewards.streak and data.rewards.streak.ready) then
+		return
+	end
+	streakShown = true
+	task.delay(2.5, function()
+		local latest = ClientState.data
+		if latest then
+			QuestsPanel.showStreak(latest)
+		end
+	end)
+end
+
+-- Quest progress toasts are throttled per quest so a busy harvest doesn't flood the screen.
+local lastProgressToast: { [string]: number } = {}
+local PROGRESS_TOAST_GAP = 6
 
 local function onState(data: { [string]: any }, _previous: { [string]: any }?)
 	Hud.render(data)
 	updateBadges()
+	maybeShowStreak(data)
 	if openPanel then
 		renderPanel(openPanel, true)
 	end
@@ -556,6 +592,7 @@ local function onFeel(name: string, ctx: { [string]: any })
 			LevelBar.essence(ctx.position, ctx.xp)
 		end
 		Hud.celebrate("Backpack", nil, if ctx.isGiant then 0.25 else 0.12)
+		ComboPopup.harvested()
 	elseif name == Net.Feedback.Sold then
 		Hud.coinBurst(ctx.coins or 0, pressOrigin())
 		UIController.notify("Reward", "You earned " .. Format.coins(ctx.coins or 0) .. " Coins!", "From selling your crops", "Coins")
@@ -672,6 +709,45 @@ local function onFeel(name: string, ctx: { [string]: any })
 				5
 			)
 		end
+	elseif name == Net.Feedback.QuestProgress then
+		local key = tostring(ctx.period) .. ":" .. tostring(ctx.index)
+		local now = os.clock()
+		if now - (lastProgressToast[key] or -math.huge) >= PROGRESS_TOAST_GAP then
+			lastProgressToast[key] = now
+			Toasts.push(ctx.text or "Quest", {
+				kind = "Info",
+				subtitle = string.format("%s / %s", Format.coins(ctx.progress or 0), Format.coins(ctx.goal or 0)),
+				icon = "Quest",
+				priority = "Low",
+				duration = 2,
+			})
+		end
+	elseif name == Net.Feedback.QuestComplete then
+		if ctx.kind == "chest" then
+			UIController.notify("Reward", "A star chest is ready!", "Open it in Quests > Weekly", "Gift", "High")
+		else
+			UIController.notify("Reward", "Quest complete!", ctx.text, "Quest", "High")
+		end
+		Hud.celebrate("Quests", C.Gold, 0.3)
+		updateBadges()
+	elseif name == Net.Feedback.RewardClaimed then
+		local reward = ctx.reward or {}
+		if (reward.coins or 0) > 0 then
+			Hud.coinBurst(reward.coins, pressOrigin())
+		end
+		if (reward.xp or 0) > 0 then
+			LevelBar.essence(pressOrigin() :: any, reward.xp)
+		end
+		local title = if ctx.source == "streak"
+			then string.format("Day %d reward!", ctx.day or 1)
+			elseif ctx.source == "chest" then (if ctx.big then "BIG star chest!" else "Star chest opened!")
+			elseif ctx.source == "saved" then "We saved your rewards!"
+			else "Quest reward!"
+		UIController.notify("Reward", title, QuestsPanel.describe(reward), if ctx.source == "chest" then "Gift" else "Reward", "High")
+		if (ctx.stars or 0) > 0 then
+			toast(string.format("+%d %s", ctx.stars, if ctx.stars == 1 then "Star" else "Stars"), C.Gold, 2.5, "Low")
+		end
+		Hud.celebrate("Quests", C.Gold, if ctx.big then 0.35 else 0.2)
 	elseif name == Net.Feedback.Denied then
 		local reason = REASONS[ctx.reason or ""]
 		if reason then

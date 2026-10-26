@@ -42,6 +42,9 @@ Net.Actions = {
 	ClaimPlot = "ClaimPlot", -- { slot? } no slot = the server picks a free one
 	UseTool = "UseTool", -- { toolId, ownerUserId, plotId }
 	BuySupply = "BuySupply", -- { supplyId, amount }
+	ClaimStreak = "ClaimStreak", -- {} today's login streak reward
+	ClaimQuest = "ClaimQuest", -- { period = "daily" | "weekly", index }
+	ClaimChest = "ClaimChest", -- { index } a star track chest
 }
 
 -- Feedback event names the server can send. The client maps these to feel presets.
@@ -71,6 +74,10 @@ Net.Feedback = {
 	Fertilized = "Fertilized",
 	-- Sent to everyone in the server so each client can play the tool animation.
 	ToolUsed = "ToolUsed",
+	-- Retention (RewardService).
+	QuestProgress = "QuestProgress",
+	QuestComplete = "QuestComplete",
+	RewardClaimed = "RewardClaimed",
 }
 
 return Net
