@@ -9,13 +9,14 @@
 	  Left         stack of wide buttons (big icon hanging off the left edge, bold
 	               name, red "!" badge on the corner): Backpack (seeds, supplies + tools,
 	               ribbons; badge = new ribbons), Upgrades, Fairs (fair waiting for an
-	               entry), Champion (needs care)
+	               entry), Champion (needs care), Quests (rewards ready to claim)
 	  Top right    Settings icon
 	  Bottom right countdowns to the hourly, daily and weekly weigh-ins (FairTimers)
 	  Top center   travel buttons: My Garden (your plot) and Shops (Seed Shop, Sell, Fair)
 	Seeds and supplies are bought and veggies sold at the stands in the middle, not from the HUD.
 	  Bottom       seed hotbar (selected seed lifts up)
 	  Top center   toasts, under the travel buttons (own ScreenGui above panels and modals)
+	  Upper middle harvest combo ("COMBO x4!", UI/ComboPopup)
 
 	Fly-to targets for effects (harvest -> basket in G4, coins, essence):
 	    Hud.target("Coins" | "Level" | "Backpack" | "Upgrades" | "Fair" | "Champion" | "Settings" | "Seeds")
@@ -43,6 +44,7 @@ local EssenceFX = require(script.Parent.Parent.Feel.EssenceFX)
 local Icons = require(script.Parent.Icons)
 local ToolBar = require(script.Parent.ToolBar)
 local FairTimers = require(script.Parent.FairTimers)
+local ComboPopup = require(script.Parent.ComboPopup)
 local Teleport = require(script.Parent.Parent.Controllers.Teleport)
 
 local Hud = {}
@@ -55,6 +57,7 @@ Hud.NAV = {
 	{ id = "Upgrades", panel = "Upgrades", text = "Upgrades", icon = "Upgrades", color = Theme.Colors.Purple },
 	{ id = "Fair", panel = "Fair", text = "Fairs", icon = "Trophy", color = Theme.Colors.Gold },
 	{ id = "Champion", panel = "Champion", text = "Champion", icon = "Crown", color = Theme.Colors.Danger },
+	{ id = "Quests", panel = "Quests", text = "Quests", icon = "Quest", color = Theme.Colors.Info },
 } :: { NavEntry }
 
 -- Top right icon.
@@ -718,6 +721,7 @@ function Hud.build(playerGui: Instance, onMenu: (panel: string, tab: string?) ->
 	buildSettings(onMenu)
 	buildTravel()
 	buildSeedDock()
+	ComboPopup.mount(root)
 	FairTimers.mount(root, function(fair)
 		onMenu("Fair", fair)
 	end)

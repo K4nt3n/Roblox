@@ -58,6 +58,7 @@ Theme.PanelAccent = {
 	Tools = Theme.Colors.Info,
 	Upgrades = Theme.Colors.Purple,
 	Settings = Theme.Colors.Gold,
+	Quests = Theme.Colors.Info,
 }
 
 --[[

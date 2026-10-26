@@ -76,6 +76,16 @@ function Schema.default(config: any): { [string]: any }
 		},
 		-- Limits on social watering: { day = number, targets = { [userId string] = count } }
 		friendWaterLog = { day = 0, targets = {} },
+		-- Retention (RewardService). Days and weeks are fair period ids.
+		rewards = {
+			-- Login streak: days in a row claimed, and the day of the last claim.
+			streak = { count = 0, lastDay = -1 },
+			-- Quests for the current period: { id = period id, list = { RewardMath.Quest } }
+			daily = { id = -1, list = {} },
+			weekly = { id = -1, list = {} },
+			-- Star track for the current week: stars earned, chests opened ("1".."5" -> true).
+			stars = { week = -1, count = 0, opened = {} },
+		},
 		-- receiptId -> unix time, for idempotent ProcessReceipt.
 		purchases = {},
 		lastSeenAt = 0,

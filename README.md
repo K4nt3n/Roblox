@@ -49,6 +49,10 @@ luau tests/run.luau
 | XP essence | Harvesting, caring and watering a friend's garden send glowing orbs from the crop into the XP bar. The bar fills a step per orb and rolls over on level-up. | `Feel/EssenceFX`, `UI/LevelBar` |
 | Skip wait | Developer product stub. In Studio the Skip button simulates a purchase; set real ids in `Config.Monetization`. Receipts are idempotent. **Honest shop:** a champion can be skipped once per week, a skipped champion leaves Natural Grown, and the shop says so. | `MonetizationService` |
 | Welcome back | On join you get a summary of what ripened while you were away. | `GardenService:_sendWelcomeBack` |
+| Daily reward | A 7-day login streak. A card pops up on join with today's reward; day 7 is the big one, then it loops. Missing a day starts over at day 1. Days follow the Daily Fair, so the HUD timer counts down to the next one. | `RewardService`, `shared/RewardMath`, `UI/QuestsPanel` |
+| Quests | 3 daily and 3 weekly quests per player (harvest, sell, water friends, care for a champion...), picked by a seed so they match on every server. Progress comes from the feedback events services already send (`NetService.FeedbackSent`). Each claim pays coins/XP/items and stars. | `RewardService`, `Config.Rewards.quests` |
+| Star track | Stars from claims open 5 chests along a weekly bar. Anything finished but unclaimed at a reset is given automatically, so nobody loses a reward. | `Config.Rewards.starTrack` |
+| Harvest combo | Quick harvests in a row show "COMBO x4!", bigger and warmer each step, with a rising-pitch sound hook. Feel only, no reward. | `UI/ComboPopup` |
 
 ## Architecture
 
@@ -60,6 +64,7 @@ src/
     EconomyMath.luau   prices, upgrades, XP
     FairMath.luau      fair periods, divisions, show phases, ribbon ids, tiers
     CareMath.luau      champion care schedule and credit
+    RewardMath.luau    login streak, quest picking and progress, star track
     Format.luau        coins / kg / durations
     Net.luau           remote, action and feedback names
     Signal.luau        tiny event class
@@ -77,6 +82,7 @@ src/
       FairService        hourly/daily/weekly entries, a board per division, rewards
       FairDayService     the live weigh-in show state machine
       MonetizationService  dev products, receipts, champion skip cap, pass checks
+      RewardService      daily login streak, daily/weekly quests, weekly star track
   client/            StarterPlayerScripts.Client
     init.client.luau   starts Feel -> Garden -> UI, then listens for state
     ClientState.luau   latest snapshot + signals, server-synced clock

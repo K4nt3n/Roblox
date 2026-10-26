@@ -14,6 +14,7 @@ require("./CareMath.spec")
 require("./Format.spec")
 require("./Schema.spec")
 require("./StudMath.spec")
+require("./RewardMath.spec")
 
 if not TestKit.report() then
 	error("tests failed")

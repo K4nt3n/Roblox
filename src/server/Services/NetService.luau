@@ -15,8 +15,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Net)
+local Signal = require(Shared.Signal)
 
 local NetService = {}
+
+-- (player, eventName, context) for every feedback event sent, so services such
+-- as RewardService can follow gameplay without hooks in every other service.
+NetService.FeedbackSent = Signal.new()
 
 type Handler = (player: Player, payload: { [string]: any }) -> (boolean, any)
 
@@ -151,6 +156,7 @@ end
 
 function NetService:Feedback(player: Player, eventName: string, context: { [string]: any }?)
 	(remotes[Net.Remotes.Feedback] :: RemoteEvent):FireClient(player, eventName, context or {})
+	self.FeedbackSent:Fire(player, eventName, context or {})
 end
 
 function NetService:Broadcast(remoteName: string, ...: any)

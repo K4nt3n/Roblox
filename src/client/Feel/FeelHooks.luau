@@ -53,6 +53,12 @@ FeelHooks.Sounds = {
 	FairPodiumPop = "",
 	FairConfetti = "",
 	ServerPrize = "",
+	-- Retention: quests, daily reward, star chests, harvest combo (plays higher each step).
+	QuestProgress = "",
+	QuestComplete = "",
+	RewardClaimed = "",
+	RewardClaimedBig = "",
+	Combo = "",
 } :: { [string]: string }
 
 FeelHooks.Animations = {
@@ -78,12 +84,14 @@ FeelHooks.Particles = {
 	CareDone = "",
 	FairWeighIn = "",
 	FairConfetti = "",
+	RewardClaimedBig = "",
 } :: { [string]: string }
 
 -- Volume per event (default 0.5).
 FeelHooks.Volume = {
 	CoinTick = 0.25,
 	EssenceTick = 0.2,
+	QuestProgress = 0.3,
 } :: { [string]: number }
 
 return FeelHooks

@@ -32,7 +32,7 @@ FeelController.positionResolver = nil :: ((context: { [string]: any }) -> Vector
 local soundCache: { [string]: Sound } = {}
 local animCache: { [string]: AnimationTrack } = {}
 
-local function playSound(name: string)
+local function playSound(name: string, pitch: number?)
 	local id = FeelHooks.Sounds[name]
 	if not id or id == "" then
 		return
@@ -46,6 +46,8 @@ local function playSound(name: string)
 		sound.Parent = SoundService
 		soundCache[name] = sound
 	end
+	-- Rising pitch for repeats (combo steps).
+	sound.PlaybackSpeed = pitch or 1
 	SoundService:PlayLocalSound(sound)
 end
 
@@ -139,6 +141,22 @@ local Presets: { [string]: (context: { [string]: any }) -> string? } = {
 		Tweens.cameraPunch(5)
 		return nil
 	end,
+	QuestComplete = function()
+		Tweens.cameraPunch(2)
+		return nil
+	end,
+	RewardClaimed = function(context)
+		if context.big then
+			Tweens.cameraPunch(6)
+			return "RewardClaimedBig"
+		end
+		Tweens.cameraPunch(2.5)
+		return nil
+	end,
+	Combo = function(context)
+		Tweens.cameraPunch(math.min(0.5 + (context.count or 2) * 0.25, 3))
+		return nil
+	end,
 }
 
 function FeelController.play(name: string, context: { [string]: any }?)
@@ -151,7 +169,7 @@ function FeelController.play(name: string, context: { [string]: any }?)
 	if preset then
 		hookName = preset(ctx) or name
 	end
-	playSound(hookName)
+	playSound(hookName, ctx.pitch)
 	playAnimation(hookName)
 	emitParticles(hookName, ctx.position)
 	if ctx.isRecord then

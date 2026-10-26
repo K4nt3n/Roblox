@@ -65,6 +65,16 @@ Run with **Test → Local Server, 2 players** unless noted. Automated tests for 
 - [ ] Rollover: set an hourly `anchorUnix` so the hour ends in two minutes. The announce banner counts down, the show runs by itself, and results arrive as a card after it. A player who joins after the show gets "You missed the ... Here's the replay".
 - [ ] Ribbons panel lists every ribbon won with a readable name.
 
+## Daily reward, quests and star track
+- [ ] First join: about 2.5 s in, the "Daily Reward!" card shows 7 days with Day 1 glowing. Claim: coins fly into the coin pill, the Quests badge drops by one, "+1 Star" toast.
+- [ ] Rejoin the same day: no card. Quests > Daily says "come back tomorrow for Day 2".
+- [ ] Next day test: in Config set `Fair.periods.daily.seconds` to 120 and rejoin after 2 minutes. Day 2 is offered; after 4+ minutes away it starts over at Day 1 ("a fresh start").
+- [ ] Quests > Daily lists 3 quests. Harvest, plant, sell, water, bugs and fertilizer move the bars, with a small progress toast at most every 6 s per quest.
+- [ ] Finishing a quest: "Quest complete!" toast, the Quests button pops and its badge counts it. Claim pays coins and XP (orbs fly to the XP bar) and stars.
+- [ ] Quests > Weekly: star bar fills; a chest turns gold when reached and opens once. Locked chests shake and say how many stars they need.
+- [ ] Leave a quest finished but unclaimed, wait for the (shortened) day to roll over: "We saved your rewards!" pays it, and new quests appear.
+- [ ] Harvest several ripe crops within 3 s of each other: "COMBO x2!", "x3!"... grows and warms up, then fades.
+
 ## Skip wait (stub)
 - [ ] Shop → Garden → Skip on a growing crop makes it ripe at once (Studio only).
 

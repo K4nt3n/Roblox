@@ -427,6 +427,78 @@ Config.Monetization = {
 	},
 }
 
+--[[
+	Retention: daily login streak, daily and weekly quests, and the weekly star
+	track (RewardService, shared/RewardMath). A day is one Daily Fair and a week
+	is one Weekly Grand Fair, so the HUD fair timers count down to every reset.
+	Rewards are bundles: { coins, xp, seeds = { cropId = n }, supplies = { supplyId = n } }.
+	All amounts are first guesses, to be balanced later.
+]]
+Config.Rewards = {
+	dayPeriod = "daily",
+	weekPeriod = "weekly",
+	streak = {
+		-- Claiming on day n of the streak pays days[n]. Missing a day starts over at
+		-- day 1; after the last day it loops back to day 1.
+		days = {
+			{ coins = 100 },
+			{ coins = 150, seeds = { tomato = 3 } },
+			{ coins = 250, supplies = { fertilizer = 2 } },
+			{ coins = 350, seeds = { tomato = 5 } },
+			{ coins = 500, supplies = { fertilizer = 3 } },
+			{ coins = 700, xp = 100 },
+			-- The big one.
+			{ coins = 1500, xp = 250, supplies = { fertilizer = 5 } },
+		},
+		-- Stars toward the weekly star track for each daily claim.
+		stars = 1,
+	},
+	--[[
+		Quest kinds and what counts toward them (RewardService maps feedback events):
+		  plant, harvest, harvestGiant, sell (veggies sold), earn (coins from selling),
+		  water (your own crops), waterFriend, pests, fertilize, care (champion), enterFair
+		Each player gets `count` quests per period, picked from the pool by a seed so
+		they are the same on every server. Never two of the same kind at once.
+	]]
+	quests = {
+		daily = {
+			count = 3,
+			pool = {
+				{ id = "d_plant", kind = "plant", goal = 8, text = "Plant %d seeds", reward = { coins = 120, xp = 30 }, stars = 1 },
+				{ id = "d_harvest", kind = "harvest", goal = 8, text = "Harvest %d crops", reward = { coins = 150, xp = 40 }, stars = 1 },
+				{ id = "d_sell", kind = "sell", goal = 10, text = "Sell %d veggies", reward = { coins = 150, xp = 30 }, stars = 1 },
+				{ id = "d_earn", kind = "earn", goal = 400, text = "Earn %d Coins selling veggies", reward = { coins = 200, xp = 30 }, stars = 1 },
+				{ id = "d_water", kind = "water", goal = 6, text = "Water your crops %d times", reward = { coins = 100, xp = 30 }, stars = 1 },
+				{ id = "d_pests", kind = "pests", goal = 3, text = "Get rid of bugs %d times", reward = { coins = 120, xp = 40 }, stars = 1 },
+				{ id = "d_fertilize", kind = "fertilize", goal = 2, text = "Use Fertilizer %d times", reward = { coins = 100, xp = 30, supplies = { fertilizer = 2 } }, stars = 1 },
+			},
+		},
+		weekly = {
+			count = 3,
+			pool = {
+				{ id = "w_harvest", kind = "harvest", goal = 60, text = "Harvest %d crops", reward = { coins = 1200, xp = 250 }, stars = 3 },
+				{ id = "w_earn", kind = "earn", goal = 5000, text = "Earn %d Coins selling veggies", reward = { coins = 1500, xp = 200 }, stars = 3 },
+				{ id = "w_giant", kind = "harvestGiant", goal = 3, text = "Harvest %d GIANT crops", reward = { coins = 1200, xp = 300 }, stars = 3 },
+				{ id = "w_friend", kind = "waterFriend", goal = 10, text = "Water friends' gardens %d times", reward = { coins = 1000, xp = 250 }, stars = 3 },
+				{ id = "w_care", kind = "care", goal = 5, text = "Care for a champion %d times", reward = { coins = 1000, xp = 300 }, stars = 3 },
+				{ id = "w_fair", kind = "enterFair", goal = 3, text = "Enter a fair %d times", reward = { coins = 1000, xp = 200 }, stars = 3 },
+				{ id = "w_plant", kind = "plant", goal = 50, text = "Plant %d seeds", reward = { coins = 1000, xp = 200 }, stars = 3 },
+			},
+		},
+	},
+	-- Weekly star track: chests open at these star counts. Resets with the Weekly Grand Fair.
+	-- A full week of play gives about 7 (streak) + 21 (daily quests) + 9 (weekly quests) stars.
+	starTrack = {
+		{ stars = 3, reward = { coins = 300 } },
+		{ stars = 8, reward = { coins = 600, seeds = { tomato = 5 }, supplies = { fertilizer = 3 } } },
+		{ stars = 14, reward = { coins = 1200, xp = 300 } },
+		{ stars = 22, reward = { coins = 2500, supplies = { fertilizer = 6 } } },
+		{ stars = 30, reward = { coins = 5000, xp = 800 }, big = true },
+	},
+	-- Harvests closer together than this (seconds) build a combo counter on screen.
+	comboWindowSeconds = 3,
+}
+
 Config.Data = {
 	storeName = "GVF_PlayerData_v1",
 	fairStorePrefix = "GVF_Fair_v2_",
